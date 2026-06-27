@@ -12,6 +12,17 @@
 <link rel="manifest" href="assets/favicon_io/site.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Nano Banana">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Nano Banana — clicker/idle banane : farme, monte ton empire, et affronte Amine-Banane dans un combat final. Toutes les bananes, pour la science. 🍌">
+<!-- image de partage (réseaux sociaux / lien) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="🍌 Nano Banana">
+<meta property="og:description" content="Farme toutes les bananes et bats AMINE-BANANE. Un clicker/idle drôle et nerveux.">
+<meta property="og:image" content="assets/amine-nano-banana.png">
+<meta property="og:image:alt" content="Amine-Banane, le boss final de Nano Banana">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="🍌 Nano Banana">
+<meta name="twitter:description" content="Farme toutes les bananes et bats AMINE-BANANE.">
+<meta name="twitter:image" content="assets/amine-nano-banana.png">
 <style>
 /* =========================================================================
    NANO BANANA — clicker / idle  (1 fichier, vanilla, zéro dépendance)
@@ -611,6 +622,7 @@ body.noanim .banana-halo{ opacity:.18; }
 const CONFIG = {
   saveKey:"nanoBananaSave",
   saveVersion:2,
+  debugPassword:"ghis",     // mot de passe du mode debug
   tickMs:100,
   autoSaveMs:15000,
   offlineCapHours:8,        // gains hors-ligne plafonnés (augmentable via 🔋 Batterie)
@@ -694,7 +706,10 @@ const CONFIG = {
   ],
 
   // banane dorée
-  golden:{ minDelay:75, maxDelay:240, lifetime:13 },
+  golden:{ minDelay:75, maxDelay:240, lifetime:13,
+    prodMult:4, prodDur:15,    // Frénésie : prod ×4 pendant 15 s (avant : ×7 / 30 s)
+    clickMult:20, clickDur:8,  // Clic chargé : clic ×20 pendant 8 s (avant : ×77 / 15 s)
+    rainSeconds:300 },         // Pluie : ~5 min de prod (avant : 15 min)
 
   // succès (check(s) → bool)
   achievements:[
@@ -950,7 +965,7 @@ function globalMult(){
   m *= 1 + (S.permaProd||0);                                    // B1 — bonus permanent d'événement
   { const w=weatherEff(); if(w.prodMult) m*=w.prodMult; }       // B2 — météo
   if(eventBuffTimer>0) m *= eventBuffMult;                      // B1 — buff temporaire d'événement
-  if(prodFrenzy>0) m *= 7;                                      // frénésie ×7 (banane dorée)
+  if(prodFrenzy>0) m *= CONFIG.golden.prodMult;                // frénésie prod (banane dorée)
   if(rotPenalty>0) m *= CONFIG.rotten.malusProd;               // B4 — malus banane pourrie
   return m;
 }
@@ -1006,7 +1021,7 @@ function clickPower(){
   base *= talentClickMult()*specialClickMult();                 // A3 talents + A4 spéciales
   if(CONFIG.features.synergies) base *= synergyMult("click");   // A2 — synergie Labos → clic
   base += clickFracTotal()*perSecond();
-  if(clickFrenzy>0) base *= 77;                                 // "clic chargé" ×77 (banane dorée)
+  if(clickFrenzy>0) base *= CONFIG.golden.clickMult;            // "clic chargé" (banane dorée)
   if(frenzyTimer>0) base *= frenzyParams().mult;               // A1 — frénésie de clic (boost CLIC uniquement)
   base *= comboMult();                                         // bonus de COMBO (CLIC uniquement, retombe à l'arrêt)
   return base;
@@ -1038,6 +1053,8 @@ function buyQty(p){
    ========================================================================= */
 const SUF=["","K","M","Md","T","Qa","Qi","Sx","Sp","Oc","No","Dc"];
 function fmt(n){
+  n=Number(n);                       // null/undefined/"" → coercition (jamais de crash sur .toFixed)
+  if(Number.isNaN(n)) return "0";
   if(!isFinite(n)) return "∞";
   if(n<0) return "-"+fmt(-n);
   if(n<1000) return (Math.floor(n)===n? n.toString() : n.toFixed(1));
@@ -1082,6 +1099,14 @@ function load(){
     S.ui=d.ui||{}; S.lore=d.lore||{};
     S.talents=d.talents||{}; S.collection=d.collection||{}; S.daily=d.daily||null;
     S.combat=d.combat||{};
+    // anti-save corrompu : on garantit des nombres valides sur les champs critiques
+    const num=(v,def)=>{ v=Number(v); return isFinite(v)? v : def; };
+    S.bananas=num(S.bananas,0); S.totalEarned=num(S.totalEarned,Math.max(0,S.bananas));
+    S.palier=Math.min(8,Math.max(1, num(S.palier,1)|0));
+    S.adn=num(S.adn,0); S.prestiges=num(S.prestiges,0)|0;
+    S.totalClicks=num(S.totalClicks,0)|0; S.goldenClicks=num(S.goldenClicks,0)|0;
+    S.playMs=num(S.playMs,0); S.amineStolen=num(S.amineStolen,0); S.permaProd=num(S.permaProd,0);
+    for(const k in S.producers) S.producers[k]=Math.max(0, num(S.producers[k],0)|0);
     return true;
   }catch(e){ return false; }
 }
@@ -1574,15 +1599,16 @@ goldenEl.addEventListener("click",()=>{
   FX.burst(gx,gy,18,{glyph:"🌟",size:10,spread:300,up:60,life:0.9});
   FX.burst(gx,gy,14,{color:"#ffd400",spread:280,up:80});
   const r=Math.random();
-  if(r<0.55){ prodFrenzy=30; toast("🔥 FRÉNÉSIE ! Production ×7 (30 s)"); }
-  else if(r<0.8){ const lot=perSecond()*900 + clickPower()*30; earn(lot); toast("🍌 PLUIE DE BANANES ! +"+fmt(lot)); shakeEl(document.querySelector(".count-wrap")); FX.confetti(80); }
-  else { clickFrenzy=15; toast("⚡ CLIC CHARGÉ ! Clic ×77 (15 s)"); }
+  const G=CONFIG.golden;
+  if(r<0.55){ prodFrenzy=G.prodDur; toast(`🔥 FRÉNÉSIE ! Production ×${G.prodMult} (${G.prodDur} s)`); }
+  else if(r<0.8){ const lot=perSecond()*G.rainSeconds + clickPower()*20; earn(lot); toast("🍌 PLUIE DE BANANES ! +"+fmt(lot)); shakeEl(document.querySelector(".count-wrap")); FX.confetti(80); }
+  else { clickFrenzy=G.clickDur; toast(`⚡ CLIC CHARGÉ ! Clic ×${G.clickMult} (${G.clickDur} s)`); }
   blip(880,0.08); hideGolden(); updateAll();
 });
 function updateFrenzyBanner(){
   const parts=[];
-  if(prodFrenzy>0)  parts.push(`🔥 FRÉNÉSIE ×7 — ${Math.ceil(prodFrenzy)}s`);
-  if(clickFrenzy>0) parts.push(`⚡ CLIC ×77 — ${Math.ceil(clickFrenzy)}s`);
+  if(prodFrenzy>0)  parts.push(`🔥 FRÉNÉSIE ×${CONFIG.golden.prodMult} — ${Math.ceil(prodFrenzy)}s`);
+  if(clickFrenzy>0) parts.push(`⚡ CLIC ×${CONFIG.golden.clickMult} — ${Math.ceil(clickFrenzy)}s`);
   if(frenzyTimer>0) parts.push(`👊 FRÉNÉSIE ×${frenzyParams().mult} — ${Math.ceil(frenzyTimer)}s`);
   if(rotPenalty>0)  parts.push(`🤢 POURRI −${Math.round((1-CONFIG.rotten.malusProd)*100)}% — ${Math.ceil(rotPenalty)}s`);
   if(parts.length){
@@ -2334,7 +2360,23 @@ const btnSound=document.getElementById("btnSound");
 btnSound.addEventListener("click",()=>{ S.sound=!S.sound; btnSound.textContent=S.sound?"🔊 Son : ON":"🔇 Son : OFF"; if(S.sound)blip(660); });
 
 /* ---- mode debug ---- */
-document.getElementById("btnDebug").addEventListener("click",()=>{ document.getElementById("debugPanel").classList.toggle("hidden"); });
+let debugUnlocked=false;
+document.getElementById("btnDebug").addEventListener("click",()=>{
+  if(debugUnlocked){ document.getElementById("debugPanel").classList.toggle("hidden"); return; }
+  showOverlay(`<div class="title ink" style="font-size:22px">🔒 Mode debug</div>
+    <p style="font-size:13px;opacity:.8;margin:10px 0">Entre le mot de passe :</p>
+    <input id="dbgPass" type="password" autocomplete="off" style="width:100%;padding:10px;font-size:16px;border:3px solid var(--ink);border-radius:10px;background:var(--paper);color:var(--text);font-family:inherit;box-sizing:border-box">
+    <button class="btn" id="dbgPassOk" style="margin-top:10px">Valider 🔓</button>
+    <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
+  const inp=document.getElementById("dbgPass");
+  const tryPass=()=>{
+    if(inp.value===CONFIG.debugPassword){ debugUnlocked=true; closeOverlay(); document.getElementById("debugPanel").classList.remove("hidden"); toast("🔓 Mode debug débloqué"); }
+    else { inp.value=""; inp.placeholder="❌ Mauvais mot de passe"; toast("❌ Mauvais mot de passe"); }
+  };
+  document.getElementById("dbgPassOk").addEventListener("click",tryPass);
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter") tryPass(); });
+  setTimeout(()=>inp.focus(),50);
+});
 document.getElementById("debugPanel").addEventListener("click",e=>{
   const b=e.target.closest("[data-dbg]"); if(!b) return;
   switch(b.dataset.dbg){
