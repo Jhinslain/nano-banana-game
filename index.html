@@ -15,14 +15,15 @@
 <meta name="description" content="Nano Banana — clicker/idle banane : farme, monte ton empire, et affronte Amine-Banane dans un combat final. Toutes les bananes, pour la science. 🍌">
 <!-- image de partage (réseaux sociaux / lien) -->
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://nano-banana-game.vercel.app/">
 <meta property="og:title" content="🍌 Nano Banana">
 <meta property="og:description" content="Farme toutes les bananes et bats AMINE-BANANE. Un clicker/idle drôle et nerveux.">
-<meta property="og:image" content="assets/amine-nano-banana.png">
+<meta property="og:image" content="https://nano-banana-game.vercel.app/assets/amine-nano-banana.png">
 <meta property="og:image:alt" content="Amine-Banane, le boss final de Nano Banana">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="🍌 Nano Banana">
 <meta name="twitter:description" content="Farme toutes les bananes et bats AMINE-BANANE.">
-<meta name="twitter:image" content="assets/amine-nano-banana.png">
+<meta name="twitter:image" content="https://nano-banana-game.vercel.app/assets/amine-nano-banana.png">
 <style>
 /* =========================================================================
    NANO BANANA — clicker / idle  (1 fichier, vanilla, zéro dépendance)
@@ -217,6 +218,11 @@ header.top .adn{ position:absolute; right:10px; top:6px; font-weight:900; font-s
 @keyframes floatUp{ 0%{opacity:1; transform:translate(-50%,0) scale(.8)} 20%{transform:translate(-50%,-10px) scale(1.15)} 100%{opacity:0; transform:translate(-50%,-70px) scale(1)} }
 .particle{ position:absolute; font-size:22px; animation:fly .8s ease-out forwards; }
 @keyframes fly{ to{ opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--rot)); } }
+/* onde de choc au clic */
+.shockwave{ position:absolute; transform:translate(-50%,-50%); border-radius:50%; pointer-events:none;
+  border:3px solid var(--accent); animation:shock .45s ease-out forwards; mix-blend-mode:screen; }
+@keyframes shock{ 0%{ width:14px;height:14px;opacity:.9 } 100%{ width:140px;height:140px;opacity:0; border-width:1px } }
+.floatnum.big{ font-size:30px; color:var(--accent); }
 
 /* échelle bananière */
 .ladder{ width:min(96vw,440px); background:var(--paper); border:3px solid var(--ink); border-radius:14px;
@@ -366,8 +372,13 @@ textarea{ width:100%; height:80px; border:3px solid var(--ink); border-radius:10
 @keyframes breathe{ 0%,100%{ transform:translateY(0) scale(1) } 50%{ transform:translateY(-3%) scale(1.018) } }
 .banana-btn:hover .banana-art{ animation-duration:1.8s; }
 .banana-btn.pop .banana-art{ animation:squash .26s cubic-bezier(.3,1.6,.5,1); }
-@keyframes squash{ 0%{transform:scale(1,1)} 28%{transform:scale(1.18,.82) translateY(3%)} 55%{transform:scale(.9,1.12) translateY(-4%)} 100%{transform:scale(1,1)} }
+@keyframes squash{ 0%{transform:scale(1,1)} 28%{transform:scale(1.22,.8) translateY(4%)} 55%{transform:scale(.88,1.14) translateY(-5%)} 100%{transform:scale(1,1)} }
 .banana-stage:active .banana-disc{ filter:brightness(1.12); }
+/* flash lumineux de la pastille au clic */
+.banana-btn.pop .banana-disc{ animation:discflash .3s ease-out; }
+@keyframes discflash{ 0%{ box-shadow:inset 0 0 0 6px rgba(255,255,255,.18) }
+  25%{ box-shadow:inset 0 0 0 7px rgba(255,255,255,.55), 0 0 34px 10px var(--accent) }
+  100%{ box-shadow:inset 0 0 0 6px rgba(255,255,255,.18) } }
 
 /* combo meter */
 .combo{ position:absolute; top:-6px; left:50%; transform:translate(-50%,-100%) scale(.6); z-index:8;
@@ -617,7 +628,7 @@ body.noanim .banana-halo{ opacity:.18; }
 "use strict";
 /* =========================================================================
    CONFIG — toutes les valeurs d'équilibrage sont ici (faciles à ajuster).
-   Cible : première run ~2–3 h (clic + idle mêlés) jusqu'à la NANO BANANA.
+   Cible : première run ~1 h (clic + idle mêlés) jusqu'à la NANO BANANA — réglée au simulateur.
    ========================================================================= */
 const CONFIG = {
   saveKey:"nanoBananaSave",
@@ -630,7 +641,8 @@ const CONFIG = {
   costGrowth:1.15,          // coût(n) = base × 1.15^possédés (signature du genre)
   click:{ base:1 },
   // scaling tycoon : chaque seuil possédé d'UN producteur double sa prod unitaire (×2)
-  producerMilestones:[10,25,50,100,150,200,250,300,400,500],
+  // (adouci après playtest : ×16 max — assez pour garder les producteurs bas utiles, sans faire exploser la prod)
+  producerMilestones:[25,100,250,500],
   eraBonusPerStep:1.30,     // chaque palier d'échelle franchi : prod globale ×1.30
   achBonus:0.01,            // chaque succès : +1% prod globale
   adnBonus:0.02,            // chaque 🧬 : +2% prod globale (permanent)
@@ -654,17 +666,17 @@ const CONFIG = {
   // 8 paliers = 8 chapitres = 8 actes. DOUBLE CONDITION : bananes ≥ at ET producteur reqP possédé (≥ reqN)
   paliers:[
     {n:1, name:"Le petit service",          ic:"🤝", at:0,      reqP:"hand",   reqN:1, ingr:"Pulpe vitale"},
-    {n:2, name:"Le petit business",         ic:"💰", at:350,    reqP:"monkey", reqN:1, ingr:"Pièce jaune"},
-    {n:3, name:"L'empire banane",           ic:"🏦", at:9000,   reqP:"farm",   reqN:1, ingr:"Graine prime"},
-    {n:4, name:"L'obsession",               ic:"😵", at:200000, reqP:"green",  reqN:1, ingr:"Contrat simiesque"},
-    {n:5, name:"La grande usine",           ic:"🏭", at:5e6,    reqP:"plant",  reqN:1, ingr:"Sceau d'État"},
-    {n:6, name:"Le laboratoire secret",     ic:"🧪", at:1.2e8,  reqP:"lab",    reqN:1, ingr:"Brevet nano"},
-    {n:7, name:"La conscience artificielle",ic:"🤖", at:3e9,    reqP:"ai",     reqN:1, ingr:"Cellule potassium"},
-    {n:8, name:"Le vrai plan",              ic:"😈", at:8e10,   reqP:"nano",   reqN:1, ingr:"Coeur quantique"},
+    {n:2, name:"Le petit business",         ic:"💰", at:1500,   reqP:"monkey", reqN:1, ingr:"Pièce jaune"},
+    {n:3, name:"L'empire banane",           ic:"🏦", at:40000,  reqP:"farm",   reqN:1, ingr:"Graine prime"},
+    {n:4, name:"L'obsession",               ic:"😵", at:1e6,    reqP:"green",  reqN:1, ingr:"Contrat simiesque"},
+    {n:5, name:"La grande usine",           ic:"🏭", at:3e7,    reqP:"plant",  reqN:1, ingr:"Sceau d'État"},
+    {n:6, name:"Le laboratoire secret",     ic:"🧪", at:7e8,    reqP:"lab",    reqN:1, ingr:"Brevet nano"},
+    {n:7, name:"La conscience artificielle",ic:"🤖", at:2e10,   reqP:"ai",     reqN:1, ingr:"Cellule potassium"},
+    {n:8, name:"Le vrai plan",              ic:"😈", at:7e11,   reqP:"nano",   reqN:1, ingr:"Coeur quantique"},
   ],
 
   // assemblage final
-  nano:{ cost:1e12, name:"NANO BANANA" },
+  nano:{ cost:1e13, name:"NANO BANANA" },   // coût final épique (~10 T), réglable
 
   // améliorations : clickAdd / clickMult / clickFrac / global / producer(target)
   upgrades:[
@@ -684,14 +696,14 @@ const CONFIG = {
     {id:"u_bless",  name:"Bénédiction du Grand Régime",ic:"🌈",desc:"Toute la production ×3",cost:3.5e9,  type:"global", val:3},
     {id:"u_toe",    name:"Théorie du Tout bananier",ic:"🌌", desc:"Toute la production ×3",  cost:2e11,   type:"global", val:3},
     // --- producteurs ciblés (req : 10 possédés) ---
-    {id:"p_hand",   name:"Gloutonnerie",            ic:"🍽️", desc:"Main cueilleuse ×2",      cost:500,    type:"producer", target:"hand",  req:10},
-    {id:"p_monkey", name:"Syndicat des singes",     ic:"🐵", desc:"Singe employé ×2",        cost:5000,   type:"producer", target:"monkey",req:10},
-    {id:"p_farm",   name:"Irrigation goutte-à-goutte",ic:"🚿",desc:"Bananeraie ×2",          cost:55000,  type:"producer", target:"farm",  req:10},
-    {id:"p_green",  name:"Climat contrôlé",         ic:"🌡️", desc:"Serre hydroponique ×2",   cost:600000, type:"producer", target:"green", req:10},
-    {id:"p_drone",  name:"Essaim de drones",        ic:"📡", desc:"Drone récolteur ×2",      cost:6.5e6,  type:"producer", target:"drone", req:10},
-    {id:"p_plant",  name:"Chaîne robotisée",        ic:"🦿", desc:"Usine à bananes ×2",      cost:1e8,    type:"producer", target:"plant", req:10},
-    {id:"p_lab",    name:"CRISPR-banane",           ic:"🧫", desc:"Labo génétique ×2",       cost:1e9,    type:"producer", target:"lab",   req:10},
-    {id:"p_ai",     name:"Réseau neuronal jaune",   ic:"🕸️", desc:"IA bananière ×2",         cost:1.6e10, type:"producer", target:"ai",    req:10},
+    {id:"p_hand",   name:"Gloutonnerie",            ic:"🍽️", desc:"Main cueilleuse ×2",      cost:500,    type:"producer", target:"hand",  req:10, val:2},
+    {id:"p_monkey", name:"Syndicat des singes",     ic:"🐵", desc:"Singe employé ×2",        cost:5000,   type:"producer", target:"monkey",req:10, val:2},
+    {id:"p_farm",   name:"Irrigation goutte-à-goutte",ic:"🚿",desc:"Bananeraie ×2",          cost:55000,  type:"producer", target:"farm",  req:10, val:2},
+    {id:"p_green",  name:"Climat contrôlé",         ic:"🌡️", desc:"Serre hydroponique ×2",   cost:600000, type:"producer", target:"green", req:10, val:2},
+    {id:"p_drone",  name:"Essaim de drones",        ic:"📡", desc:"Drone récolteur ×2",      cost:6.5e6,  type:"producer", target:"drone", req:10, val:2},
+    {id:"p_plant",  name:"Chaîne robotisée",        ic:"🦿", desc:"Usine à bananes ×2",      cost:1e8,    type:"producer", target:"plant", req:10, val:2},
+    {id:"p_lab",    name:"CRISPR-banane",           ic:"🧫", desc:"Labo génétique ×2",       cost:1e9,    type:"producer", target:"lab",   req:10, val:2},
+    {id:"p_ai",     name:"Réseau neuronal jaune",   ic:"🕸️", desc:"IA bananière ×2",         cost:1.6e10, type:"producer", target:"ai",    req:10, val:2},
     // --- améliorations qui SCALENT avec le nombre possédé (producteurs bas restent utiles) ---
     {id:"s_hand",   name:"Gants ergonomiques",      ic:"🧤", desc:"Main cueilleuse : +1% prod par Main possédée", cost:3000,  type:"selfScale", target:"hand",  per:0.01, req:10},
     {id:"s_monkey", name:"Régime de motivation",    ic:"🍌", desc:"Singe : +1% prod par Singe possédé",          cost:40000, type:"selfScale", target:"monkey",per:0.01, req:10},
@@ -888,23 +900,24 @@ const CONFIG = {
     ],
   },
   boss:{
-    hp:100, shotDamage:20, lives:3, maxLives:5,
-    chargeMax:100, chargePerBanana:8, comboBonus:2, missCharge:6,   // banane ratée (tombée en bas) : -6 charge
-    sliceRadius:34, retryCostFrac:0.25, restoreBonus:1.5,
+    // DUR par défaut : sans préparation c'est exigeant ; les atouts payants changent vraiment la donne
+    hp:220, shotDamage:18, lives:3, maxLives:6,
+    chargeMax:100, chargePerBanana:7, comboBonus:2, missCharge:8,   // banane ratée (tombée en bas) : -8 charge
+    sliceRadius:28, retryCostFrac:0.25, restoreBonus:1.5,
     phases:[
-      { hpTo:66, rate:2.0, bombPct:0.15, fall:[95,150] },
-      { hpTo:33, rate:3.0, bombPct:0.20, fall:[140,210] },
-      { hpTo:0,  rate:4.0, bombPct:0.25, fall:[190,280] },
+      { hpTo:66, rate:2.6, bombPct:0.18, fall:[130,190] },   // phase 1 — déjà nerveuse
+      { hpTo:33, rate:3.8, bombPct:0.27, fall:[185,265] },   // phase 2 — ça pleut
+      { hpTo:0,  rate:5.2, bombPct:0.35, fall:[250,350] },   // phase 3 — panique + salves
     ],
-    salvo:{ every:10, count:3 },
+    salvo:{ every:8, count:4 },
   },
   combatUpgrades:[
-    {id:"life",  ic:"🍌❤️", name:"Vie supplémentaire", desc:"+1 vie (max 5)",        cost:8e10, eff:{life:1}},
-    {id:"magnet",ic:"🧲",   name:"Aimant à bananes",    desc:"Tranche plus large",     cost:3e10, eff:{radius:16}},
-    {id:"cannon",ic:"⚡",   name:"Canon survitaminé",   desc:"+4 charge par banane",   cost:3e10, eff:{charge:4}},
-    {id:"ammo",  ic:"💥",   name:"Munitions lourdes",   desc:"+8 dégâts par tir",      cost:8e10, eff:{damage:8}},
-    {id:"vest",  ic:"🛡️",   name:"Gilet anti-bombe",    desc:"Absorbe la 1re bombe",   cost:3e10, eff:{vest:1}},
-    {id:"slow",  ic:"🐢",   name:"Ralentisseur",        desc:"Objets −20% plus lents", cost:8e10, eff:{slow:0.8}},
+    {id:"ammo",  ic:"💥",   name:"Munitions lourdes",   desc:"+14 dégâts par tir (×2 moins de tirs)", cost:6e11, eff:{damage:14}},
+    {id:"cannon",ic:"⚡",   name:"Canon survitaminé",   desc:"+6 charge par banane (tire bien plus vite)", cost:4e11, eff:{charge:6}},
+    {id:"magnet",ic:"🧲",   name:"Aimant à bananes",    desc:"Hitbox de tranche ×2 (rate moins)",     cost:3e11, eff:{radius:26}},
+    {id:"slow",  ic:"🐢",   name:"Ralentisseur",        desc:"Objets −28% plus lents (plus de temps)", cost:5e11, eff:{slow:0.72}},
+    {id:"life",  ic:"🍌❤️", name:"Vie supplémentaire", desc:"+1 vie (jusqu'à 6)",     cost:7e11, eff:{life:1}, stack:3},
+    {id:"vest",  ic:"🛡️",   name:"Gilet anti-bombe",    desc:"Absorbe 2 bombes par combat", cost:4e11, eff:{vest:2}},
   ],
 };
 
@@ -972,8 +985,8 @@ function globalMult(){
 function producerMult(id){
   let m=1; const cnt=S.producers[id]||0;
   for(const uid in S.upgrades){ const u=UMAP[uid]; if(!u||!S.upgrades[uid])continue;
-    if(u.type==="producer" && u.target===id) m*=u.val;
-    if(u.type==="selfScale" && u.target===id) m*=(1+cnt*u.per);   // gain qui scale avec le nombre possédé
+    if(u.type==="producer" && u.target===id) m*=(u.val||1);      // défensif : val manquant ≠ NaN
+    if(u.type==="selfScale" && u.target===id) m*=(1+cnt*(u.per||0));   // gain qui scale avec le nombre possédé
   }
   if(CONFIG.features.synergies) m*=synergyMult(id);            // A2
   return m;
@@ -1525,10 +1538,10 @@ function doClick(clientX,clientY){
   S.totalClicks++;
   bumpCombo(); dailyAdd("clicks",1);
   checkHidden();   // pour les conditions liées au nombre exact de clics
-  spawnFloat(clientX,clientY,"+"+fmt(gain)+" 🍌");
+  spawnFloat(clientX,clientY,"+"+fmt(gain)+" 🍌", comboCount>=30);   // gros chiffre coloré quand le combo chauffe
   spawnParticles(clientX,clientY);
   bananaBtn.classList.remove("pop"); void bananaBtn.offsetWidth; bananaBtn.classList.add("pop");
-  blip(500 + Math.min(comboCount,24)*8, 0.04); // le pitch monte avec le combo
+  clickSound(comboCount);   // pop juteux qui monte avec le combo
 }
 
 function tryAssemble(){
@@ -1825,15 +1838,25 @@ const FX=(function(){
 
 const fxLayer=document.getElementById("fxLayer");
 function localXY(clientX,clientY){ const r=fxLayer.getBoundingClientRect(); return [clientX-r.left, clientY-r.top]; }
-function spawnFloat(cx,cy,txt){
+function spawnFloat(cx,cy,txt,big){
   const [x,y]=localXY(cx,cy);
-  const el=document.createElement("div"); el.className="floatnum"; el.textContent=txt;
-  el.style.left=x+"px"; el.style.top=y+"px";
+  const el=document.createElement("div"); el.className="floatnum"+(big?" big":""); el.textContent=txt;
+  el.style.left=(x+(Math.random()*16-8))+"px"; el.style.top=y+"px";   // léger décalage = vivant
   fxLayer.appendChild(el); setTimeout(()=>el.remove(),1000);
 }
+function shockwave(cx,cy){
+  if(REDUCE) return;
+  const [x,y]=localXY(cx,cy);
+  const el=document.createElement("div"); el.className="shockwave";
+  el.style.left=x+"px"; el.style.top=y+"px";
+  fxLayer.appendChild(el); setTimeout(()=>el.remove(),460);
+}
 function spawnParticles(cx,cy){
-  FX.burst(cx,cy, 5, {glyph:"🍌", size:11, spread:250, up:90, life:0.7});
-  FX.burst(cx,cy, 7, {spread:270, up:130, life:0.6});
+  const inten=1 + Math.min(comboCount,200)/120;            // monte avec le combo (jusqu'à ~2.7×)
+  FX.burst(cx,cy, Math.min(Math.round(5*inten),16), {glyph:"🍌", size:10, spread:240*inten, up:95, life:0.7});
+  FX.burst(cx,cy, Math.min(Math.round(7*inten),20), {shape:"circle", color:"#fff3b0", size:3.5, spread:280*inten, up:120, life:0.5});  // étincelles
+  FX.burst(cx,cy, Math.min(Math.round(4*inten),12), {spread:250*inten, up:140, life:0.55});                                            // éclats jaunes
+  shockwave(cx,cy);
 }
 
 /* ---- banane vivante : combo + jauge de Frénésie (A1) + halo ---- */
@@ -1906,6 +1929,27 @@ function blip(freq,vol){
     g.gain.value=(vol||0.05); o.connect(g); g.connect(actx.destination);
     o.start(); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12);
     o.stop(actx.currentTime+0.13);
+  }catch(e){}
+}
+// son de clic « juteux » : pop/pluck à pitch descendant, monte avec le combo
+function clickSound(combo){
+  if(!S.sound) return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const t=actx.currentTime, base=440 + Math.min(combo,48)*11;
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type="triangle";
+    o.frequency.setValueAtTime(base*1.9, t);
+    o.frequency.exponentialRampToValueAtTime(base, t+0.05);       // petit « pluck »
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.07, t+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.12);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+0.13);
+    // petite harmonique aiguë pour le « croquant »
+    const o2=actx.createOscillator(), g2=actx.createGain();
+    o2.type="sine"; o2.frequency.setValueAtTime(base*3, t);
+    g2.gain.setValueAtTime(0.025, t); g2.gain.exponentialRampToValueAtTime(0.0001, t+0.06);
+    o2.connect(g2); g2.connect(actx.destination); o2.start(t); o2.stop(t+0.07);
   }catch(e){}
 }
 
@@ -2036,30 +2080,34 @@ amineNextBtn.addEventListener("click",()=>{
 
 /* ---- préparation au combat (boutique d'améliorations) ---- */
 function bossTalentDamage(){ if(S.talents&&S.talents.f4)return 15; if(S.talents&&S.talents.f3)return 8; if(S.talents&&S.talents.f1)return 3; return 0; }
+function cuLevel(u){ return u.stack ? (S.combat[u.id]||0) : (S.combat[u.id]?1:0); }   // niveau possédé (0..max)
 function combatStat(){
   const cu=S.combat||{}, B=CONFIG.boss, U=CONFIG.combatUpgrades;
-  const eff=id=>U.find(u=>u.id===id).eff;
+  const eff=id=>{ const u=U.find(x=>x.id===id); return u?u.eff:{}; };
   return {
-    lives: Math.min(B.maxLives, B.lives + (cu.life?1:0)),
+    lives: Math.min(B.maxLives, B.lives + (cu.life|0)),                 // vie empilable
     radius: B.sliceRadius + (cu.magnet?eff("magnet").radius:0),
     charge: B.chargePerBanana + (cu.cannon?eff("cannon").charge:0),
     damage: B.shotDamage + (cu.ammo?eff("ammo").damage:0) + bossTalentDamage(),
-    vest: cu.vest?1:0,
+    vest: cu.vest?eff("vest").vest:0,                                   // correctif : utilise eff.vest (2)
     slow: cu.slow?eff("slow").slow:1,
   };
 }
 function buyCombatUpgrade(id){
-  const u=CONFIG.combatUpgrades.find(x=>x.id===id);
-  if(!u || S.combat[id] || S.bananas<u.cost) return;
-  S.bananas-=u.cost; S.combat[id]=true; toast("⚔️ "+u.name+" acheté !"); save(); updateAll(); openBossPrep();
+  const u=CONFIG.combatUpgrades.find(x=>x.id===id); if(!u) return;
+  const max=u.stack||1, lv=cuLevel(u);
+  if(lv>=max || S.bananas<u.cost) return;
+  S.bananas-=u.cost; S.combat[id]= u.stack ? lv+1 : true;
+  toast("⚔️ "+u.name+" acheté !"); save(); updateAll(); openBossPrep();
 }
 function openBossPrep(){
   const cs=combatStat();
   const shop=CONFIG.combatUpgrades.map(u=>{
-    const owned=S.combat[u.id], ok=S.bananas>=u.cost;
-    return `<button class="card" data-cu="${u.id}" ${owned||!ok?"disabled":""}>
-      <span class="ic">${u.ic}</span><span class="body"><span class="nm">${u.name}</span><span class="ds">${u.desc}</span></span>
-      <span class="right"><span class="cost ${ok&&!owned?'ok':''}">${owned?'✓ acquis':fmt(u.cost)+' 🍌'}</span></span></button>`;
+    const max=u.stack||1, lv=cuLevel(u), maxed=lv>=max, ok=S.bananas>=u.cost && !maxed;
+    const label = maxed ? "✓ acquis" : fmt(u.cost)+" 🍌";
+    return `<button class="card" data-cu="${u.id}" ${maxed||S.bananas<u.cost?"disabled":""}>
+      <span class="ic">${u.ic}</span><span class="body"><span class="nm">${u.name}${u.stack?` <b style="color:var(--accent2)">Niv ${lv}/${max}</b>`:""}</span><span class="ds">${u.desc}</span></span>
+      <span class="right"><span class="cost ${ok?'ok':''}">${label}</span></span></button>`;
   }).join("");
   showOverlay(`<div class="title ink" style="font-size:24px">⚔️ Préparation</div>
     <p style="font-weight:700;margin:8px 0;font-size:14px">Amine-Banane t'attend. Achète des améliorations (gardées à vie), puis frappe.</p>
@@ -2112,7 +2160,7 @@ const Boss=(function(){
   function sliceObj(o){
     o.sliced=true; o.vy=-120*DPR-Math.random()*120*DPR; o.vx=(Math.random()-.5)*260*DPR; o.spin=(Math.random()-.5)*16; o.life=0.7;
     if(o.type==="bomb"){
-      if(st.vest){ st.vest=0; st.pops.push({x:o.x,y:o.y,life:.5,txt:"🛡️"}); toast("🛡️ Gilet : bombe absorbée !"); }
+      if(st.vest>0){ st.vest--; st.pops.push({x:o.x,y:o.y,life:.5,txt:"🛡️"}); toast("🛡️ Gilet : bombe absorbée ! ("+st.vest+" restante"+(st.vest>1?"s":"")+")"); }
       else { st.lives--; setTaunt(CONFIG.story.taunts.bomb, "moqueur"); flash("#f33",.45); st.shake=12; if(st.lives<=0){ lose(); return; } }
     } else {
       combo++; let add=st.charge + (combo>1?CONFIG.boss.comboBonus*(combo-1):0);
@@ -2145,7 +2193,7 @@ const Boss=(function(){
     const P=CONFIG.boss.phases[st.phase];
     st.spawnT-=dt;
     if(st.spawnT<=0){ st.spawnT += 1/P.rate; spawnObj(Math.random()<P.bombPct); }
-    if(st.phase===2){ st.salvoT-=dt; if(st.salvoT<=0){ st.salvoT=CONFIG.boss.salvo.every; for(let i=0;i<CONFIG.boss.salvo.count;i++) setTimeout(()=>{ if(running) spawnObj(true); }, i*180); } }
+    if(st.phase>=1){ st.salvoT-=dt; if(st.salvoT<=0){ st.salvoT=CONFIG.boss.salvo.every; const n=CONFIG.boss.salvo.count+(st.phase===2?1:0); for(let i=0;i<n;i++) setTimeout(()=>{ if(running) spawnObj(true); }, i*160); } }
   }
   function update(dt){
     spawnTick(dt);
@@ -2283,15 +2331,19 @@ function doPrestige(){
     <button class="btn" id="confirmPrestige">Composter ✅</button>
     <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
   document.getElementById("confirmPrestige").addEventListener("click",()=>{
-    const keep={ adn:S.adn+gain, prestiges:S.prestiges+1, achievements:S.achievements,
-      totalClicks:S.totalClicks, goldenClicks:S.goldenClicks, won:S.won, winStats:S.winStats,
-      sound:S.sound, startTime:S.startTime, playMs:S.playMs, bigOffline:S.bigOffline,
-      lore:S.lore, ui:S.ui, usedTransfer:S.usedTransfer, bigReturn48:S.bigReturn48,
-      talents:S.talents, collection:S.collection, daily:S.daily,
-      introSeen:S.introSeen, bossWon:S.bossWon, bossAttempts:S.bossAttempts, combat:S.combat };
+    // Compostage = retour à 0. On NE garde que : ADN, améliorations d'ADN (talents), et les stats méta
+    // (temps de jeu, nombre de compostages). Succès & collection = déblocages permanents (gardés).
+    // Tout le reste est remis à zéro : bananes, producteurs, améliorations, histoire, BOSS, quêtes…
+    const keep={
+      adn:S.adn+gain, prestiges:S.prestiges+1, talents:S.talents,   // ADN + améliorations d'ADN + compostages
+      playMs:S.playMs, startTime:S.startTime,                        // stat temps de jeu
+      achievements:S.achievements, collection:S.collection,         // déblocages permanents
+      ui:S.ui, sound:S.sound, introSeen:true,                       // confort / réglages
+    };
     S=Object.assign(defaultState(), keep);
+    S.daily=null;   // quêtes réinitialisées (régénérées au prochain tick)
     curEra=0; closeOverlay(); refreshEra(); renderLadder(); renderAssemble(); renderJournal();
-    renderCollection(); renderQuests(); renderAdnPanel();
+    ensureDaily(); renderCollection(); renderQuests(); renderAdnPanel();
     updateAll(); save(); toast("♻️ Composté ! +"+fmt(gain)+" 🧬");
     setTimeout(()=>toast("👑 Titre : "+currentTitle()),500);
   });
