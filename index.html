@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#ffce00">
 <title>🍌 Nano Banana</title>
+<link rel="icon" type="image/x-icon" href="assets/favicon_io/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon_io/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon_io/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/favicon_io/apple-touch-icon.png">
+<link rel="manifest" href="assets/favicon_io/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Nano Banana">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
 /* =========================================================================
    NANO BANANA — clicker / idle  (1 fichier, vanilla, zéro dépendance)
@@ -224,6 +231,13 @@ header.top .adn{ position:absolute; right:10px; top:6px; font-weight:900; font-s
 .card:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow); }
 .card[disabled]{ opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
 .card[disabled]:active{ transform:none; box-shadow:4px 4px 0 var(--shadow);}
+/* états découverte : verrouillé (🔒 grisé renforcé) → débloquable (✓ + halo vert) */
+.lockst{ display:none; font-size:14px; font-weight:900; line-height:1; margin-bottom:2px; text-align:right; }
+.card.locked{ opacity:.6; filter:grayscale(.7); }
+.card.locked .lockst{ color:#8a8a8a; }
+.card.ready{ box-shadow:0 0 0 2px var(--good), 4px 4px 0 var(--shadow); }
+.card.ready:active{ box-shadow:0 0 0 2px var(--good), 2px 2px 0 var(--shadow); }
+.card.ready .lockst{ color:var(--good); }
 .card .ic{ font-size:30px; width:42px; text-align:center; flex:0 0 auto; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.25)); }
 .card .body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
 .card .nm{ display:block; font-weight:900; font-size:14px; line-height:1.15; }
@@ -402,6 +416,20 @@ body.noanim .combo.ms{ animation:none; }
 .amine-box.boss .amine-name{ color:#9bff2a; }
 .amine-text{ font-weight:700; font-size:15px; line-height:1.45; margin:10px 4px 14px; min-height:60px; }
 
+/* ---- panneau ADN (haut-droite) ---- */
+#adnBadge{ cursor:pointer; user-select:none; transition:transform .1s ease; }
+#adnBadge:active{ transform:scale(.94); }
+#adnBadge.open{ background:var(--accent); }
+#adnPanel{ position:fixed; top:46px; right:8px; z-index:42; width:min(92vw,340px); max-height:80dvh; overflow:auto;
+  background:var(--paper); border:3px solid var(--ink); border-radius:14px; box-shadow:6px 6px 0 var(--shadow); padding:12px;
+  -webkit-overflow-scrolling:touch; overscroll-behavior:contain; animation:adnIn .18s ease; }
+#adnPanel.hidden{ display:none; }
+@keyframes adnIn{ from{ opacity:0; transform:translateY(-8px) scale(.97) } to{ opacity:1; transform:none } }
+.adn-head{ display:flex; align-items:center; gap:6px; font-weight:900; font-size:15px; margin-bottom:6px; }
+.adn-head button{ margin-left:auto; width:30px; height:30px; border:2px solid var(--ink); border-radius:8px; background:var(--paper2); font-weight:900; cursor:pointer; color:var(--text); line-height:1; }
+.adn-head button:active{ transform:translate(1px,1px); }
+.adn-hint{ font-size:12px; opacity:.85; line-height:1.45; padding:8px; border:2px dashed var(--ink); border-radius:10px; background:var(--paper2); }
+
 /* ---- combat de boss ---- */
 #bossLayer{ position:fixed; inset:0; z-index:70; background:#0a0612; }
 #bossCanvas{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
@@ -513,8 +541,6 @@ body.noanim .banana-halo{ opacity:.18; }
       <button class="btn alt" id="btnExport">📤 Exporter la sauvegarde</button>
       <button class="btn alt" id="btnImport">📥 Importer une sauvegarde</button>
       <button class="btn danger" id="btnReset">💥 Tout recommencer</button>
-      <div id="prestigeWrap"></div>
-      <div id="talentWrap"></div>
 
       <button class="btn alt" id="btnDebug" style="margin-top:14px">🐞 Mode debug</button>
       <div id="debugPanel" class="hidden">
@@ -565,6 +591,16 @@ body.noanim .banana-halo{ opacity:.18; }
 
 <!-- combat de boss : Banana Ninja -->
 <div id="bossLayer" class="hidden"><canvas id="bossCanvas"></canvas></div>
+
+<!-- panneau ADN (arbre de talents + compostage) ancré en haut à droite -->
+<div id="adnPanel" class="hidden">
+  <div class="adn-head">🧬 ADN — <b id="adnPanelBal">0</b> dispo <button id="adnPanelClose" aria-label="Fermer">✕</button></div>
+  <div class="adn-body">
+    <div id="adnHint" class="adn-hint hidden">Bats <b>Amine-Banane</b>, puis <b>composte</b> pour gagner ton premier 🧬 ADN — à dépenser ici en bonus permanents.</div>
+    <div id="prestigeWrap"></div>
+    <div id="talentWrap"></div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -1191,7 +1227,7 @@ function buildProducers(){
         <span class="rate"></span>
         <span class="milestone"><i></i><span class="ms-label"></span></span>
         <span class="share"></span></span>
-      <span class="right"><span class="cost"></span><span class="cnt">0</span></span>`;
+      <span class="right"><span class="lockst"></span><span class="cost"></span><span class="cnt">0</span></span>`;
     b.addEventListener("click",()=>buyProducer(p.id));
     producerList.appendChild(b); prodEls[p.id]=b;
   });
@@ -1232,7 +1268,13 @@ function updateProducers(){
     const cE=b.querySelector(".cost");
     cE.textContent=(S.buyAmount==="max"?`×${k} `:"")+fmt(cost)+" 🍌";
     cE.classList.toggle("ok",ok);
-    if(ok && b._afford===false) retrigger(b,"afford");
+    // état verrouillé (🔒 grisé) → débloquable (✓) — seulement avant le 1er achat (découverte)
+    const discover = owned===0;
+    b.classList.toggle("locked", discover && !ok);
+    b.classList.toggle("ready",  discover && ok);
+    const ls=b.querySelector(".lockst");
+    if(discover){ ls.style.display=""; ls.textContent= ok?"✓":"🔒"; } else ls.style.display="none";
+    if(ok && b._afford===false) retrigger(b,"afford");   // moment du déblocage : flash
     b._afford=ok;
     b.disabled=!ok;
   });
@@ -1245,7 +1287,7 @@ function buildUpgrades(){
     const b=document.createElement("button"); b.className="card"; b.dataset.id=u.id;
     b.innerHTML=`<span class="ic">${u.ic}</span>
       <span class="body"><span class="nm">${u.name}</span><span class="ds">${u.desc}</span></span>
-      <span class="right"><span class="cost"></span></span>`;
+      <span class="right"><span class="lockst"></span><span class="cost"></span></span>`;
     b.addEventListener("click",()=>buyUpgrade(u.id));
     upgradeList.appendChild(b); upgEls[u.id]=b;
   });
@@ -1265,7 +1307,11 @@ function updateUpgrades(){
     if(!b._shown){ b.style.display=""; retrigger(b,"reveal"); b._shown=true; }
     const ok=S.bananas>=u.cost;
     const cE=b.querySelector(".cost"); cE.textContent=fmt(u.cost)+" 🍌"; cE.classList.toggle("ok",ok);
-    if(ok && b._afford===false) retrigger(b,"afford");
+    // état verrouillé (🔒 grisé) → débloquable (✓)
+    b.classList.toggle("locked", !ok);
+    b.classList.toggle("ready", ok);
+    const ls=b.querySelector(".lockst"); ls.style.display=""; ls.textContent= ok?"✓":"🔒";
+    if(ok && b._afford===false) retrigger(b,"afford");   // moment du déblocage : flash
     b._afford=ok;
     b.disabled=!ok;
   });
@@ -1892,8 +1938,8 @@ function overlayWin(){
       <div class="stat-row"><span>⚔️ Tentatives de boss</span><b>${w.attempts||1}</b></div>
       ${w.restored?`<div class="stat-row"><span>💰 Bananes récupérées</span><b>${fmt(w.restored)}</b></div>`:""}
     </div>
-    <button class="btn" onclick="closeOverlay()">Continuer en bac à sable 🏖️</button>
-    <button class="btn alt" onclick="closeOverlay(); openWidget('menu');">Voir le compostage ♻️</button>`);
+    <button class="btn" onclick="closeOverlay()">🏖️ Bac à sable</button>
+    <button class="btn alt" onclick="closeOverlay(); doPrestige();">♻️ Compostage</button>`);
   overlayBox.style.position="relative"; overlayBox.style.overflow="hidden";
   FX.canvas.style.zIndex="60"; // confettis au-dessus de l'overlay
   winShowerTimers.forEach(clearTimeout);
@@ -2205,10 +2251,10 @@ function renderPrestige(){
 }
 function doPrestige(){
   const gain=adnAvailable();
-  if(gain<1) return;
+  if(gain<1){ toast("Pas encore assez de bananes produites pour composter."); return; }
   showOverlay(`<div class="title ink" style="font-size:26px">♻️ Composter ?</div>
-    <p style="margin:14px 0;font-weight:700">Tu vas perdre bananes, producteurs et améliorations, mais gagner <b style="color:var(--accent2)">+${fmt(gain)} 🧬</b>.</p>
-    <button class="btn" id="confirmPrestige">Composter ♻️</button>
+    <p style="margin:14px 0;font-weight:700;line-height:1.5">Tu vas revenir à <b>0</b> (bananes, producteurs, améliorations)…<br>mais tu gagnes <b style="color:var(--accent2)">🧬 ${fmt(gain)} ADN</b> à dépenser en améliorations permanentes !</p>
+    <button class="btn" id="confirmPrestige">Composter ✅</button>
     <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
   document.getElementById("confirmPrestige").addEventListener("click",()=>{
     const keep={ adn:S.adn+gain, prestiges:S.prestiges+1, achievements:S.achievements,
@@ -2218,12 +2264,35 @@ function doPrestige(){
       talents:S.talents, collection:S.collection, daily:S.daily,
       introSeen:S.introSeen, bossWon:S.bossWon, bossAttempts:S.bossAttempts, combat:S.combat };
     S=Object.assign(defaultState(), keep);
-    curEra=0; closeOverlay(); refreshEra(); renderLadder(); renderAssemble(); renderPrestige(); renderJournal();
-    renderTalents(); renderCollection(); renderQuests();
+    curEra=0; closeOverlay(); refreshEra(); renderLadder(); renderAssemble(); renderJournal();
+    renderCollection(); renderQuests(); renderAdnPanel();
     updateAll(); save(); toast("♻️ Composté ! +"+fmt(gain)+" 🧬");
     setTimeout(()=>toast("👑 Titre : "+currentTitle()),500);
   });
 }
+
+/* ---- panneau ADN (haut-droite) : arbre de talents + compostage ---- */
+const adnPanelEl=document.getElementById("adnPanel");
+const adnBadgeEl=document.getElementById("adnBadge");
+function renderAdnPanel(){
+  renderPrestige(); renderTalents();
+  const empty = !prestigeWrap.innerHTML.trim() && !talentWrap.innerHTML.trim();
+  document.getElementById("adnHint").classList.toggle("hidden", !empty);
+  document.getElementById("adnPanelBal").textContent=fmt(S.adn);
+}
+function toggleAdnPanel(){
+  const opening=adnPanelEl.classList.contains("hidden");
+  if(opening){ renderAdnPanel(); adnPanelEl.classList.remove("hidden"); }
+  else adnPanelEl.classList.add("hidden");
+  adnBadgeEl.classList.toggle("open", opening);
+}
+adnBadgeEl.addEventListener("click", toggleAdnPanel);
+document.getElementById("adnPanelClose").addEventListener("click",()=>{ adnPanelEl.classList.add("hidden"); adnBadgeEl.classList.remove("open"); });
+document.addEventListener("click",(e)=>{   // clic en dehors → fermer
+  if(adnPanelEl.classList.contains("hidden")) return;
+  if(adnPanelEl.contains(e.target) || adnBadgeEl.contains(e.target)) return;
+  adnPanelEl.classList.add("hidden"); adnBadgeEl.classList.remove("open");
+});
 
 /* =========================================================================
    MENU : export / import / reset / son
@@ -2396,6 +2465,7 @@ bananaBtn.addEventListener("contextmenu",e=>e.preventDefault());
 function updateAll(){
   updateProducers(); updateUpgrades(); updateProg(); updateStats(); updateTitle();
   document.getElementById("adnCount").textContent=fmt(S.adn);
+  const apb=document.getElementById("adnPanelBal"); if(apb) apb.textContent=fmt(S.adn);   // solde ADN live dans le panneau
 }
 function rebuildAll(){
   buildProducers(); buildUpgrades(); buildAch(); buildHidden();
