@@ -1,0 +1,2369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffce00">
+<title>🍌 Nano Banana</title>
+<style>
+/* =========================================================================
+   NANO BANANA — clicker / idle  (1 fichier, vanilla, zéro dépendance)
+   Style : banane jaune, comic / Borderlands (contours encrés, ombres dures)
+   ========================================================================= */
+
+/* ---- thèmes par ère (l'accent reste TOUJOURS banane-jaune) ---- */
+:root{
+  --ink:#160f00; --paper:#fff7d6; --paper2:#ffeeae;
+  --accent:#ffce00; --accent2:#ffb300; --good:#34c759; --gold:#ffd400;
+  --bg1:#ffd83a; --bg2:#ffb52e; --text:#160f00; --muted:#7a6418;
+  --shadow:#160f00;
+}
+body[data-era="1"]{ --bg1:#ffe04a; --bg2:#ffae2b; --paper:#fff7d6; --paper2:#ffe9a8; --accent:#ffce00; --accent2:#ff9f1c; --text:#1a1200; --muted:#8a6e15; }
+body[data-era="2"]{ --bg1:#e7ee54; --bg2:#a8d62b; --paper:#f6ffd9; --paper2:#e4f3a8; --accent:#ffe000; --accent2:#9bd60a; --text:#16210a; --muted:#5f7e1a; }
+body[data-era="3"]{ --bg1:#cfe2ef; --bg2:#8fb6d6; --paper:#f3f8ff; --paper2:#d9e9f7; --accent:#ffd400; --accent2:#3f8fd6; --text:#0e1a26; --muted:#3f6480; }
+body[data-era="4"]{ --bg1:#1a1830; --bg2:#0d0c1a; --paper:#241f3a; --paper2:#2e2750; --accent:#ffe600; --accent2:#ff3df0; --text:#fff6c2; --muted:#b59bff; --ink:#000; --shadow:#000; }
+body[data-era="5"]{ --bg1:#140b2e; --bg2:#05040f; --paper:#1c1340; --paper2:#281a55; --accent:#ffe600; --accent2:#33e8ff; --text:#f3ecff; --muted:#9af0ff; --ink:#000; --shadow:#000; }
+
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; height:100%; }
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color:var(--text);
+  background:var(--bg2);
+  overflow-x:hidden;
+  user-select:none; -webkit-user-select:none;
+  touch-action:manipulation;
+  transition:color .8s ease;
+}
+#bgfx{
+  position:fixed; inset:0; z-index:-2;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--bg1), var(--bg2) 70%);
+  transition:background .9s ease, opacity .5s ease;
+}
+#bgfx::after{ /* sunburst comic léger */
+  content:""; position:absolute; inset:-50%;
+  background:repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.05) 0deg 6deg, transparent 6deg 12deg);
+  opacity:.5; pointer-events:none;
+}
+body[data-era="4"] #bgfx::after, body[data-era="5"] #bgfx::after{
+  background:repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 2px, transparent 2px 4px); /* scanlines */
+  opacity:.6;
+}
+
+/* texte encré "Borderlands" */
+.ink{
+  font-family:"Arial Black","Arial Bold",Impact,system-ui,sans-serif;
+  font-weight:900; letter-spacing:.5px; text-transform:uppercase;
+  text-shadow:
+    -2px 0 var(--ink), 2px 0 var(--ink), 0 -2px var(--ink), 0 2px var(--ink),
+    -2px -2px var(--ink), 2px 2px var(--ink), 2px -2px var(--ink), -2px 2px var(--ink),
+    4px 4px 0 rgba(0,0,0,.25);
+  color:var(--accent);
+}
+
+/* panneaux comic : bord noir épais + ombre dure */
+.panel{
+  background:var(--paper);
+  border:3px solid var(--ink);
+  border-radius:16px;
+  box-shadow:5px 5px 0 var(--shadow);
+  padding:12px;
+}
+.panel h2{
+  margin:0 0 10px; font-size:18px;
+  font-family:"Arial Black",Impact,system-ui,sans-serif; font-weight:900;
+  text-transform:uppercase; letter-spacing:.5px;
+  color:var(--text);
+}
+.panel h2 small{ display:block; font-size:11px; font-weight:700; opacity:.7; letter-spacing:0; text-transform:none;}
+
+/* ===================== LAYOUT : tout tient en 100dvh, zéro scroll de page ===================== */
+html,body{ height:100%; overflow:hidden; }
+#stage{ position:fixed; inset:0; height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+header.top{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:10px; padding:8px 12px 2px; position:relative; z-index:5; }
+header.top .title{ font-size:clamp(20px,4.6vw,28px); }
+header.top .adn{ position:absolute; right:10px; top:6px; font-weight:900; font-size:13px;
+  background:var(--paper); border:3px solid var(--ink); border-radius:999px; padding:4px 10px; box-shadow:3px 3px 0 var(--shadow); }
+
+/* hero : la banane centrée dans l'espace restant */
+#hero{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:min(1.8vh,14px); padding:4px 10px; }
+
+/* ---- widgets flottants (déplaçables / repliables / fermables) ---- */
+.widget{ position:absolute; z-index:30; width:min(92vw,340px); max-height:72dvh; display:flex; flex-direction:column;
+  background:var(--paper); border:3px solid var(--ink); border-radius:14px; box-shadow:5px 5px 0 var(--shadow); overflow:hidden; }
+.widget.closed{ display:none; }
+.widget.collapsed{ max-height:none; }
+.widget.collapsed .widget-body{ display:none; }
+.widget.drag{ opacity:.97; box-shadow:9px 12px 0 var(--shadow); }
+.widget-bar{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:7px 7px 7px 12px; cursor:grab; touch-action:none; user-select:none;
+  background:var(--accent); border-bottom:3px solid var(--ink); }
+.widget-bar:active{ cursor:grabbing; }
+.widget-bar .wt{ font-family:"Arial Black",Impact,system-ui; font-weight:900; font-size:14px; text-transform:uppercase; color:#1a1200; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.widget-bar .wbtns{ display:flex; gap:6px; flex:0 0 auto; }
+.widget-bar .wbtns button{ width:30px; height:30px; border:2px solid var(--ink); border-radius:8px; background:var(--paper);
+  font-weight:900; font-size:13px; cursor:pointer; color:var(--text); line-height:1; display:flex; align-items:center; justify-content:center; }
+.widget-bar .wbtns button:active{ transform:translate(1px,1px); }
+.widget.collapsed .widget-bar [data-act="collapse"]{ transform:rotate(-90deg); }
+.widget-body{ flex:1 1 auto; overflow-y:auto; overflow-x:hidden; padding:10px; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.wsub{ font-family:"Arial Black",Impact,system-ui; font-weight:900; font-size:13px; text-transform:uppercase; margin-bottom:8px; color:var(--text); }
+
+/* ---- dock (rouvrir les widgets) ---- */
+#dock{ flex:0 0 auto; display:flex; justify-content:center; flex-wrap:wrap; gap:8px;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom)); z-index:36; background:linear-gradient(0deg,var(--bg2),transparent); }
+#dock button{ display:flex; flex-direction:column; align-items:center; gap:1px; min-width:60px; min-height:48px;
+  border:3px solid var(--ink); border-radius:12px; background:var(--paper); box-shadow:3px 3px 0 var(--shadow);
+  cursor:pointer; color:var(--text); font-family:inherit; font-weight:800; font-size:10px; padding:5px 8px; }
+#dock button .ti{ font-size:20px; line-height:1; }
+#dock button.on{ background:var(--accent); }
+#dock button:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--shadow); }
+.count-wrap{ text-align:center; }
+#count{ font-size:34px; line-height:1; }
+#count .b{ font-size:22px; }
+#persec{ font-weight:800; font-size:14px; opacity:.85; margin-top:2px;}
+#perclick{ font-weight:700; font-size:12px; opacity:.7; }
+#title{ font-family:"Arial Black",Impact,system-ui; font-weight:900; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:var(--accent2); margin-top:3px; }
+
+/* jauge de Frénésie (A1) */
+.frenzy-gauge{ width:min(50vh,86vw); max-width:340px; height:10px; border:3px solid var(--ink); border-radius:999px;
+  background:var(--paper2); overflow:hidden; box-shadow:3px 3px 0 var(--shadow); }
+.frenzy-gauge > i{ display:block; height:100%; width:0%;
+  background:linear-gradient(90deg,#ffe600,#ff9f1c,#ff3b1c); transition:width .12s linear; }
+.frenzy-gauge.active{ animation:frpulse .4s ease-in-out infinite; }
+.frenzy-gauge.active > i{ background:linear-gradient(90deg,#ff3b1c,#ff00d0,#ff3b1c); }
+@keyframes frpulse{ 0%,100%{ box-shadow:3px 3px 0 var(--shadow) } 50%{ box-shadow:0 0 14px 2px #ff5b1c, 3px 3px 0 var(--shadow) } }
+
+/* banane pourrie (B4) / spéciale (A4) */
+#golden.evil{ filter:drop-shadow(0 0 12px #6b4a1a) saturate(.8); }
+#golden.special{ filter:drop-shadow(0 0 16px #33e8ff); animation:goldfloat 1.2s ease-in-out infinite; }
+
+/* météo (B2) */
+#weather{ position:fixed; left:10px; top:8px; z-index:23; display:none; align-items:center; gap:4px;
+  font-weight:800; font-size:12px; background:var(--paper); border:3px solid var(--ink); border-radius:999px;
+  padding:4px 10px; box-shadow:3px 3px 0 var(--shadow); pointer-events:none; }
+
+/* quêtes (B3) */
+.quest{ border:2px solid var(--ink); border-radius:10px; background:var(--paper2); padding:7px 9px; margin-bottom:6px; }
+.quest.done{ background:var(--accent); }
+.quest .qh{ font-weight:800; font-size:12px; }
+.quest .qbar{ height:8px; border:2px solid var(--ink); border-radius:999px; background:var(--paper); overflow:hidden; margin:4px 0; }
+.quest .qbar > i{ display:block; height:100%; background:var(--accent2); transition:width .3s ease; }
+.quest .qf{ font-size:11px; font-weight:800; opacity:.85; }
+.qclaim{ font-family:inherit; font-weight:900; font-size:11px; border:2px solid var(--ink); border-radius:8px;
+  background:var(--good); color:#0a2a0a; padding:3px 8px; cursor:pointer; }
+
+/* arbre ADN (A3) */
+.talent-tree{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.tbranch{ display:flex; flex-direction:column; gap:5px; }
+.tbh{ font-weight:900; font-size:11px; text-transform:uppercase; text-align:center; opacity:.8; }
+.tnode{ display:flex; flex-direction:column; align-items:center; gap:1px; font-family:inherit;
+  border:2px solid var(--ink); border-radius:9px; background:var(--paper2); padding:5px 3px; cursor:pointer; color:var(--text); }
+.tnode .tn-ic{ font-size:18px; }
+.tnode .tn-nm{ font-size:9px; font-weight:800; text-align:center; line-height:1.05; }
+.tnode .tn-c{ font-size:9px; font-weight:900; opacity:.8; }
+.tnode.owned{ background:var(--good); color:#0a2a0a; }
+.tnode.can{ background:var(--accent); box-shadow:2px 2px 0 var(--shadow); }
+.tnode.poor{ opacity:.85; }
+.tnode.locked{ opacity:.4; filter:grayscale(.6); cursor:not-allowed; }
+
+/* journal (C1) */
+#journal .entry{ border:2px solid var(--ink); border-radius:10px; background:var(--paper2); padding:8px 10px; margin-bottom:6px;
+  font-size:12px; line-height:1.35; }
+#journal .entry.locked{ opacity:.5; font-style:italic; }
+#journal .entry b{ display:block; font-size:11px; text-transform:uppercase; opacity:.7; margin-bottom:2px; }
+
+.banana-stage{ position:relative; width:min(50vh,86vw); height:min(50vh,86vw); display:flex; align-items:center; justify-content:center; }
+.banana-btn{
+  position:relative; width:100%; height:100%; border:none; background:transparent;
+  cursor:pointer; padding:0; -webkit-user-select:none; touch-action:manipulation;
+  filter:drop-shadow(6px 8px 0 rgba(0,0,0,.28));
+}
+.banana-disc{
+  position:absolute; inset:0; border-radius:50%;
+  background:radial-gradient(circle at 50% 40%, var(--accent), var(--accent2) 75%);
+  border:4px solid var(--ink); box-shadow:inset 0 0 0 6px rgba(255,255,255,.18);
+}
+.banana-art{ position:absolute; inset:6%; display:flex; align-items:center; justify-content:center; }
+.banana-art canvas, .banana-art .emoji{
+  position:absolute; max-width:100%; max-height:100%;
+  transition:opacity .6s ease;
+}
+.banana-art .emoji{ font-size:min(34vh,56vw); line-height:1; filter:drop-shadow(3px 4px 0 rgba(0,0,0,.3)); }
+.banana-btn.pop .banana-art{ animation:pop .28s ease; }
+@keyframes pop{ 0%{transform:scale(1)} 35%{transform:scale(.9) rotate(-3deg)} 70%{transform:scale(1.06) rotate(2deg)} 100%{transform:scale(1)} }
+.fx-layer{ position:absolute; inset:-30%; pointer-events:none; overflow:visible; z-index:7; }
+.floatnum{ position:absolute; font-weight:900; font-size:20px; color:#fff;
+  text-shadow:-2px 0 #000,2px 0 #000,0 -2px #000,0 2px #000,2px 2px 0 #000;
+  animation:floatUp 1s ease-out forwards; white-space:nowrap; }
+@keyframes floatUp{ 0%{opacity:1; transform:translate(-50%,0) scale(.8)} 20%{transform:translate(-50%,-10px) scale(1.15)} 100%{opacity:0; transform:translate(-50%,-70px) scale(1)} }
+.particle{ position:absolute; font-size:22px; animation:fly .8s ease-out forwards; }
+@keyframes fly{ to{ opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--rot)); } }
+
+/* échelle bananière */
+.ladder{ width:min(96vw,440px); background:var(--paper); border:3px solid var(--ink); border-radius:14px;
+  box-shadow:4px 4px 0 var(--shadow); padding:8px 10px; }
+.ladder .steps{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
+.step{ font-size:11px; font-weight:800; padding:4px 8px; border:2px solid var(--ink);
+  border-radius:999px; background:var(--paper2); opacity:.45; display:flex; gap:4px; align-items:center;}
+.step.done{ opacity:1; background:var(--accent); color:#1a1200;}
+.step.current{ opacity:1; background:var(--accent); color:#1a1200; box-shadow:2px 2px 0 var(--shadow); transform:scale(1.05);}
+.progbar{ margin-top:8px; height:14px; border:3px solid var(--ink); border-radius:999px; background:var(--paper2); overflow:hidden; box-shadow:3px 3px 0 var(--shadow);}
+.progbar > i{ display:block; height:100%; width:0%; background:repeating-linear-gradient(45deg,var(--accent),var(--accent) 10px,var(--accent2) 10px,var(--accent2) 20px); transition:width .3s ease;}
+.prog-label{ font-size:11px; font-weight:800; text-align:center; margin-top:3px; opacity:.85;}
+
+/* --- listes / cartes --- */
+.list{ display:flex; flex-direction:column; gap:8px; max-height:none; }
+.card{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  background:var(--paper2); border:3px solid var(--ink); border-radius:14px;
+  padding:9px 10px; box-shadow:4px 4px 0 var(--shadow); cursor:pointer;
+  color:var(--text); min-height:56px; transition:transform .05s ease;
+  font-family:inherit;
+}
+.card:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow); }
+.card[disabled]{ opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
+.card[disabled]:active{ transform:none; box-shadow:4px 4px 0 var(--shadow);}
+.card .ic{ font-size:30px; width:42px; text-align:center; flex:0 0 auto; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.25)); }
+.card .body{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.card .nm{ display:block; font-weight:900; font-size:14px; line-height:1.15; }
+.card .ds{ display:block; font-size:11px; opacity:.75; line-height:1.2; }
+.card .right{ text-align:right; flex:0 0 auto; }
+.card .cost{ display:block; font-weight:900; font-size:13px; color:var(--accent2); }
+.card .cost.ok{ color:var(--good); }
+.card .cnt{ display:block; font-weight:900; font-size:18px; opacity:.85; }
+.card .rate{ display:block; font-size:10px; opacity:.7; }
+
+/* buy amount toggle */
+.seg{ display:flex; gap:6px; margin-bottom:10px; }
+.seg button{ flex:1; font-weight:900; padding:8px 0; border:3px solid var(--ink); border-radius:10px;
+  background:var(--paper2); box-shadow:3px 3px 0 var(--shadow); cursor:pointer; color:var(--text); font-family:inherit;}
+.seg button.on{ background:var(--accent); }
+
+/* succès */
+.ach-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(60px,1fr)); gap:8px; }
+.ach{ aspect-ratio:1; border:3px solid var(--ink); border-radius:12px; background:var(--paper2);
+  display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow:3px 3px 0 var(--shadow);
+  filter:grayscale(1) opacity(.45); position:relative; }
+.ach.got{ filter:none; background:var(--accent); }
+.ach .tip{ display:none; }
+
+/* menu / boutons */
+.btn{ display:block; width:100%; font-family:inherit; font-weight:900; font-size:14px; text-transform:uppercase;
+  padding:12px; margin-top:8px; border:3px solid var(--ink); border-radius:12px; background:var(--accent);
+  box-shadow:4px 4px 0 var(--shadow); cursor:pointer; color:#1a1200; }
+.btn:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--shadow); }
+.btn.alt{ background:var(--paper2); color:var(--text); }
+.btn.danger{ background:#ff5b4c; color:#fff; }
+.btn[disabled]{ opacity:.5; filter:grayscale(.5); cursor:not-allowed; }
+/* panneau debug */
+.dbg-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+.dbg-grid .btn{ margin-top:0; font-size:12px; padding:10px 6px; text-transform:none; }
+#debugPanel{ border:3px dashed var(--ink); border-radius:12px; padding:8px; margin-top:8px; background:rgba(0,0,0,.04); }
+.stat-row{ display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-bottom:1px dashed rgba(0,0,0,.15); }
+.stat-row b{ font-weight:900; }
+textarea{ width:100%; height:80px; border:3px solid var(--ink); border-radius:10px; padding:8px; font-family:monospace; font-size:11px; resize:vertical; background:var(--paper); color:var(--text);}
+
+/* assemblage NANO BANANA */
+.assemble{ background:linear-gradient(135deg,#ffe600,#ff3df0,#33e8ff); border:3px solid var(--ink);
+  border-radius:16px; padding:12px; text-align:center; box-shadow:5px 5px 0 var(--shadow); margin-top:6px; }
+.assemble .ttl{ font-family:"Arial Black",Impact; font-weight:900; text-transform:uppercase; color:#160f00; font-size:16px; }
+
+/* ===================== responsive ===================== */
+@media(min-width:980px){ .widget{ width:340px; } }
+@media(max-width:520px){
+  .widget{ width:min(94vw,440px); max-height:58dvh; }
+  #dock button .tl{ display:none; }     /* petit écran : icônes seules dans le dock */
+  #dock button{ min-width:50px; }
+}
+/* écran très court (paysage mobile) : on réduit l'échelle pour garder la banane visible */
+@media(max-height:520px){ #count{ font-size:24px; } .ladder{ display:none; } }
+
+/* ===================== overlays ===================== */
+.overlay{ position:fixed; inset:0; z-index:50; background:rgba(8,4,20,.82);
+  display:flex; align-items:center; justify-content:center; padding:18px; }
+.overlay .box{ background:var(--paper); border:4px solid var(--ink); border-radius:20px;
+  box-shadow:8px 8px 0 #000; max-width:460px; width:100%; padding:20px; text-align:center; max-height:90vh; overflow:auto;}
+.hidden{ display:none !important; }
+
+/* toasts */
+#toasts{ position:fixed; left:50%; bottom:74px; transform:translateX(-50%); z-index:40;
+  display:flex; flex-direction:column; gap:6px; align-items:center; width:max-content; max-width:92vw; pointer-events:none;}
+@media(min-width:980px){ #toasts{ bottom:18px; } }
+.toast{ background:var(--ink); color:#fff; font-weight:800; font-size:13px; padding:8px 14px;
+  border-radius:999px; border:2px solid var(--accent); box-shadow:3px 3px 0 rgba(0,0,0,.4);
+  animation:toastIn .3s ease, toastOut .4s ease 2.6s forwards; }
+@keyframes toastIn{ from{opacity:0; transform:translateY(12px) scale(.9)} to{opacity:1} }
+@keyframes toastOut{ to{opacity:0; transform:translateY(-8px)} }
+
+/* golden banana */
+#golden{ position:fixed; z-index:30; width:64px; height:64px; cursor:pointer; display:none;
+  align-items:center; justify-content:center; font-size:44px; animation:goldfloat 1.6s ease-in-out infinite;
+  filter:drop-shadow(0 0 12px gold); }
+@keyframes goldfloat{ 0%,100%{transform:translateY(0) rotate(-8deg)} 50%{transform:translateY(-10px) rotate(8deg)} }
+
+/* bandeau frénésie */
+#frenzy{ position:fixed; top:0; left:0; right:0; z-index:25; text-align:center; pointer-events:none;
+  font-family:"Arial Black",Impact; font-weight:900; text-transform:uppercase; padding:4px;
+  color:#fff; text-shadow:-2px 0 #000,2px 0 #000,0 -2px #000,0 2px #000; display:none; }
+
+/* ---- canvas particules plein écran ---- */
+#fx{ position:fixed; inset:0; z-index:9; pointer-events:none; }
+#vignette{ position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0;
+  background:radial-gradient(circle at 50% 45%, transparent 35%, rgba(255,210,0,.0) 60%, rgba(255,210,0,.55) 100%);
+  transition:opacity .12s ease; mix-blend-mode:screen; }
+#vignette.flash{ opacity:1; transition:opacity .5s ease; }
+
+/* ---- banane vivante ---- */
+.banana-halo{ position:absolute; inset:-14%; border-radius:50%; z-index:0; pointer-events:none;
+  background:radial-gradient(circle, var(--accent) 0%, transparent 62%);
+  opacity:.0; filter:blur(8px); animation:halo 2.8s ease-in-out infinite; }
+@keyframes halo{ 0%,100%{ transform:scale(.92); opacity:calc(.10 + var(--glow,0)*.30) } 50%{ transform:scale(1.06); opacity:calc(.18 + var(--glow,0)*.5) } }
+.banana-btn{ z-index:1; }
+.banana-art{ animation:breathe 3.4s ease-in-out infinite; transform-origin:50% 60%; }
+@keyframes breathe{ 0%,100%{ transform:translateY(0) scale(1) } 50%{ transform:translateY(-3%) scale(1.018) } }
+.banana-btn:hover .banana-art{ animation-duration:1.8s; }
+.banana-btn.pop .banana-art{ animation:squash .26s cubic-bezier(.3,1.6,.5,1); }
+@keyframes squash{ 0%{transform:scale(1,1)} 28%{transform:scale(1.18,.82) translateY(3%)} 55%{transform:scale(.9,1.12) translateY(-4%)} 100%{transform:scale(1,1)} }
+.banana-stage:active .banana-disc{ filter:brightness(1.12); }
+
+/* combo meter */
+.combo{ position:absolute; top:-6px; left:50%; transform:translate(-50%,-100%) scale(.6); z-index:8;
+  font-family:"Arial Black",Impact; font-weight:900; text-transform:uppercase; text-align:center;
+  color:#fff; opacity:0; transition:opacity .2s ease, transform .15s cubic-bezier(.3,1.8,.5,1); pointer-events:none;
+  text-shadow:-2px 0 #000,2px 0 #000,0 -2px #000,0 2px #000,0 0 14px var(--accent); }
+.combo.on{ opacity:1; }
+.combo .cx{ display:block; font-size:11px; letter-spacing:1px; color:var(--accent); }
+.combo .cn{ display:block; font-size:30px; line-height:.9; }
+.combo.bump{ transform:translate(-50%,-100%) scale(1.18); }
+
+/* slide-in des cartes révélées */
+.card.reveal{ animation:cardIn .35s cubic-bezier(.2,1.2,.3,1); }
+@keyframes cardIn{ from{ opacity:0; transform:translateX(-14px) scale(.96) } to{ opacity:1; transform:none } }
+/* flash vert quand un achat devient possible */
+.card.afford{ animation:afford .6s ease; }
+@keyframes afford{ 0%{ box-shadow:4px 4px 0 var(--shadow) } 25%{ box-shadow:0 0 0 3px var(--good), 4px 4px 0 var(--shadow); background:#d8ffd0 } 100%{ box-shadow:4px 4px 0 var(--shadow) } }
+
+/* shake sur gros gain */
+.shake{ animation:shake .4s ease; }
+@keyframes shake{ 0%,100%{transform:translate(0,0)} 20%{transform:translate(-4px,2px) rotate(-1deg)} 40%{transform:translate(4px,-2px) rotate(1deg)} 60%{transform:translate(-3px,1px)} 80%{transform:translate(3px,-1px)} }
+
+/* transition d'apparition des panneaux (onglets) */
+.panel.tab.active{ animation:panelIn .28s ease; }
+@keyframes panelIn{ from{ opacity:0; transform:translateY(10px) } to{ opacity:1; transform:none } }
+@media(min-width:980px){ .panel.tab.active{ animation:none; } }
+
+/* écran de victoire animé */
+.win-rays{ position:absolute; inset:-60%; z-index:-1; pointer-events:none;
+  background:conic-gradient(from 0deg, transparent 0 8deg, rgba(255,222,0,.35) 8deg 16deg);
+  animation:spin 14s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg) } }
+.win-banana{ font-size:80px; animation:forge 1.4s ease-out, breathe 3s ease-in-out 1.4s infinite;
+  filter:drop-shadow(0 0 18px gold); display:inline-block; }
+@keyframes forge{ 0%{ transform:scale(0) rotate(-180deg); opacity:0; filter:blur(8px) } 60%{ transform:scale(1.3) rotate(20deg); opacity:1 } 100%{ transform:scale(1) rotate(0) } }
+
+/* gros texte de célébration */
+.bigtext{ position:fixed; left:50%; top:38%; transform:translate(-50%,-50%); z-index:44; pointer-events:none;
+  font-size:min(13vw,64px); color:var(--accent); animation:bigpop 1.7s ease-out forwards; }
+@keyframes bigpop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.4) rotate(-6deg)} 18%{opacity:1; transform:translate(-50%,-50%) scale(1.1)} 70%{opacity:1; transform:translate(-50%,-55%) scale(1)} 100%{opacity:0; transform:translate(-50%,-70%) scale(1)} }
+
+/* ---- dialogue d'Amine ---- */
+.amine-box{ background:var(--paper); border:4px solid var(--ink); border-radius:20px; box-shadow:8px 8px 0 #000;
+  max-width:440px; width:100%; padding:18px; text-align:center; }
+.amine-portrait{ width:130px; height:130px; margin:0 auto 8px; border-radius:50%; overflow:hidden;
+  border:4px solid var(--ink); box-shadow:4px 4px 0 var(--shadow); background:radial-gradient(circle at 50% 35%,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center; position:relative; }
+.amine-portrait img{ width:100%; height:100%; object-fit:cover; display:none; }
+.amine-portrait.has-img img{ display:block; }
+.amine-portrait.has-img .amine-emoji{ display:none; }
+.amine-emoji{ font-size:74px; line-height:1; }
+.amine-box.boss .amine-portrait{ border-color:#7a0; box-shadow:0 0 22px 4px #b3ff3a, 4px 4px 0 var(--shadow); }
+.amine-name{ font-family:"Arial Black",Impact; font-weight:900; text-transform:uppercase; font-size:18px; color:var(--accent2); }
+.amine-box.boss .amine-name{ color:#9bff2a; }
+.amine-text{ font-weight:700; font-size:15px; line-height:1.45; margin:10px 4px 14px; min-height:60px; }
+
+/* ---- combat de boss ---- */
+#bossLayer{ position:fixed; inset:0; z-index:70; background:#0a0612; }
+#bossCanvas{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+
+/* gros texte de célébration */
+.bigtext-boss{ }
+
+/* accessibilité : on coupe les anims lourdes */
+body.noanim *, body.noanim *::before, body.noanim *::after{ animation:none !important; transition:none !important; }
+body.noanim .banana-halo{ opacity:.18; }
+</style>
+</head>
+<body data-era="1">
+<div id="bgfx"></div>
+<canvas id="fx"></canvas>
+<div id="vignette"></div>
+
+<div id="stage">
+  <header class="top">
+    <span class="title ink">🍌 Nano&nbsp;Banana</span>
+    <span class="adn" id="adnBadge" title="ADN de banane (prestige)">🧬 <b id="adnCount">0</b></span>
+  </header>
+
+  <!-- ============ BANANE (hero, centré) ============ -->
+  <div id="hero">
+    <div class="count-wrap">
+      <div id="count" class="ink">0 <span class="b">🍌</span></div>
+      <div id="persec">0 🍌/s</div>
+      <div id="perclick">+0 / clic</div>
+      <div id="title">Mangeur de banane</div>
+    </div>
+
+    <div class="banana-stage">
+      <span class="banana-halo" id="bananaHalo"></span>
+      <button class="banana-btn" id="bananaBtn" aria-label="Cliquer la banane">
+        <span class="banana-disc"></span>
+        <span class="banana-art" id="bananaArt"><span class="emoji">🍌</span></span>
+      </button>
+      <div class="combo" id="combo"><span class="cx">COMBO</span><span class="cn">0</span></div>
+      <div class="fx-layer" id="fxLayer"></div>
+    </div>
+
+    <div class="frenzy-gauge" id="frenzyGauge" title="Jauge de Frénésie (clique vite !)"><i id="frenzyFill"></i></div>
+
+    <div class="ladder">
+      <div class="steps" id="ladderSteps"></div>
+      <div class="progbar"><i id="progFill"></i></div>
+      <div class="prog-label" id="progLabel">Palier suivant…</div>
+    </div>
+
+    <div id="assembleWrap"></div>
+  </div>
+
+  <!-- ============ WIDGETS FLOTTANTS (déplaçables / repliables / fermables) ============ -->
+  <section class="widget" id="w-prod" data-w="prod">
+    <div class="widget-bar"><span class="wt">🏭 Auto-ferme</span>
+      <span class="wbtns"><button data-act="collapse" title="Replier">▾</button><button data-act="close" title="Fermer">✕</button></span></div>
+    <div class="widget-body">
+      <div class="seg" id="buySeg">
+        <button data-amt="1" class="on">×1</button>
+        <button data-amt="10">×10</button>
+        <button data-amt="100">×100</button>
+        <button data-amt="max">MAX</button>
+      </div>
+      <div class="list" id="producerList"></div>
+    </div>
+  </section>
+
+  <section class="widget" id="w-upg" data-w="upg">
+    <div class="widget-bar"><span class="wt">✨ Améliorations</span>
+      <span class="wbtns"><button data-act="collapse" title="Replier">▾</button><button data-act="close" title="Fermer">✕</button></span></div>
+    <div class="widget-body">
+      <div class="list" id="upgradeList"></div>
+      <div id="upgEmpty" style="font-size:12px;opacity:.6;text-align:center;padding:8px;">Rien à acheter pour l'instant… clique encore ! 🍌</div>
+    </div>
+  </section>
+
+  <section class="widget" id="w-ach" data-w="ach">
+    <div class="widget-bar"><span class="wt">🏆 Succès</span>
+      <span class="wbtns"><button data-act="collapse" title="Replier">▾</button><button data-act="close" title="Fermer">✕</button></span></div>
+    <div class="widget-body">
+      <div class="wsub">🏆 Succès — <span id="achCount">0</span> (+<span id="achBonus">0</span>% prod)</div>
+      <div class="ach-grid" id="achGrid"></div>
+      <div class="wsub" style="margin-top:14px">🔒 Cachés</div>
+      <div class="ach-grid" id="hiddenGrid"></div>
+      <div class="wsub" style="margin-top:14px">🍌 Collection</div>
+      <div class="ach-grid" id="collection"></div>
+      <div class="wsub" style="margin-top:14px">📖 Journal du savant</div>
+      <div id="journal"></div>
+    </div>
+  </section>
+
+  <section class="widget" id="w-stats" data-w="stats">
+    <div class="widget-bar"><span class="wt">📊 Stats</span>
+      <span class="wbtns"><button data-act="collapse" title="Replier">▾</button><button data-act="close" title="Fermer">✕</button></span></div>
+    <div class="widget-body">
+      <div class="wsub">📅 Quêtes du jour</div>
+      <div id="quests"></div>
+      <div class="wsub" style="margin-top:14px">📊 Stats de run</div>
+      <div id="stats"></div>
+    </div>
+  </section>
+
+  <section class="widget" id="w-menu" data-w="menu">
+    <div class="widget-bar"><span class="wt">⚙️ Menu</span>
+      <span class="wbtns"><button data-act="collapse" title="Replier">▾</button><button data-act="close" title="Fermer">✕</button></span></div>
+    <div class="widget-body">
+      <button class="btn alt" id="btnSound">🔊 Son : ON</button>
+      <button class="btn alt" id="btnExport">📤 Exporter la sauvegarde</button>
+      <button class="btn alt" id="btnImport">📥 Importer une sauvegarde</button>
+      <button class="btn danger" id="btnReset">💥 Tout recommencer</button>
+      <div id="prestigeWrap"></div>
+      <div id="talentWrap"></div>
+
+      <button class="btn alt" id="btnDebug" style="margin-top:14px">🐞 Mode debug</button>
+      <div id="debugPanel" class="hidden">
+        <div class="wsub" style="margin-bottom:4px">🐞 Triche / test</div>
+        <div class="dbg-grid">
+          <button class="btn alt" data-dbg="m1">+1M 🍌</button>
+          <button class="btn alt" data-dbg="b1">+1Md 🍌</button>
+          <button class="btn alt" data-dbg="palier">Palier +1 ⏭️</button>
+          <button class="btn alt" data-dbg="prod1">1 de chaque 📦</button>
+          <button class="btn alt" data-dbg="eraNext">Thème ▶ 🎨</button>
+          <button class="btn alt" data-dbg="eraAuto">Thème auto 🔄</button>
+          <button class="btn alt" data-dbg="golden">Banane dorée 🌟</button>
+          <button class="btn alt" data-dbg="adn">+10 ADN 🧬</button>
+          <button class="btn danger" data-dbg="win" style="grid-column:1/3">Gagner (NANO BANANA) 🏆</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- dock : rouvrir / basculer les widgets -->
+  <nav id="dock">
+    <button data-go="prod" class="on"><span class="ti">🏭</span><span class="tl">Ferme</span></button>
+    <button data-go="upg"><span class="ti">✨</span><span class="tl">Améliors</span></button>
+    <button data-go="ach"><span class="ti">🏆</span><span class="tl">Succès</span></button>
+    <button data-go="stats"><span class="ti">📊</span><span class="tl">Stats</span></button>
+    <button data-go="menu"><span class="ti">⚙️</span><span class="tl">Menu</span></button>
+  </nav>
+</div>
+
+<div id="frenzy"></div>
+<div id="weather"></div>
+<div id="golden" title="Attrape-la !">🌟</div>
+<div id="toasts"></div>
+
+<!-- overlay générique -->
+<div class="overlay hidden" id="overlay"><div class="box" id="overlayBox"></div></div>
+
+<!-- dialogue d'Amine -->
+<div class="overlay hidden" id="amineOverlay">
+  <div class="amine-box" id="amineBox">
+    <div class="amine-portrait"><img id="amineImg" alt=""><span class="amine-emoji" id="amineEmoji">🧔🏽</span></div>
+    <div class="amine-name" id="amineName">Amine</div>
+    <div class="amine-text" id="amineText"></div>
+    <button class="btn" id="amineNext">Suivant ▶</button>
+  </div>
+</div>
+
+<!-- combat de boss : Banana Ninja -->
+<div id="bossLayer" class="hidden"><canvas id="bossCanvas"></canvas></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   CONFIG — toutes les valeurs d'équilibrage sont ici (faciles à ajuster).
+   Cible : première run ~2–3 h (clic + idle mêlés) jusqu'à la NANO BANANA.
+   ========================================================================= */
+const CONFIG = {
+  saveKey:"nanoBananaSave",
+  saveVersion:1,
+  tickMs:100,
+  autoSaveMs:15000,
+  offlineCapHours:8,        // gains hors-ligne plafonnés
+  costGrowth:1.15,          // coût(n) = base × 1.15^possédés (signature du genre)
+  click:{ base:1 },
+  eraBonusPerStep:1.30,     // chaque palier d'échelle franchi : prod globale ×1.30
+  achBonus:0.01,            // chaque succès : +1% prod globale
+  adnBonus:0.02,            // chaque 🧬 : +2% prod globale (permanent)
+  prestigeDivisor:1e12,     // ADN = floor( sqrt(total / 1e12) )
+
+  // 10 producteurs (BPS = bananes/seconde) — valeurs Cookie-Clicker éprouvées
+  producers:[
+    {id:"hand",  name:"Main cueilleuse",   ic:"🖐️", rate:0.1,    cost:15,        flavor:"Cueille à mains nues."},
+    {id:"monkey",name:"Singe employé",     ic:"🐒", rate:1,      cost:100,       flavor:"Travaille pour des bananes. Littéralement."},
+    {id:"farm",  name:"Bananeraie",        ic:"🌱", rate:8,      cost:1100,      flavor:"Ça pousse tout seul."},
+    {id:"green", name:"Serre hydroponique",ic:"💧", rate:47,     cost:12000,     flavor:"Bananes sans terre, 100% science."},
+    {id:"drone", name:"Drone récolteur",   ic:"🛸", rate:260,    cost:130000,    flavor:"Bzzz. Récolte. Bzzz."},
+    {id:"plant", name:"Usine à bananes",   ic:"🏭", rate:1400,   cost:1.4e6,     flavor:"La banane à la chaîne."},
+    {id:"lab",   name:"Labo génétique",    ic:"🧪", rate:7800,   cost:2e7,       flavor:"On bricole l'ADN du fruit."},
+    {id:"ai",    name:"IA bananière",      ic:"🤖", rate:44000,  cost:3.3e8,     flavor:"Elle pense en jaune."},
+    {id:"nano",  name:"Nano-réplicateur",  ic:"⚛️", rate:260000, cost:5e9,       flavor:"Copie une banane atome par atome."},
+    {id:"worm",  name:"Trou de ver à banane",ic:"🌀",rate:1.6e6, cost:7.5e10,    flavor:"Importe des bananes d'un autre univers."},
+  ],
+
+  // Échelle bananière — 8 paliers (seuils de bananes totales) → ingrédients + fin
+  // 8 paliers = 8 chapitres de la descente d'Amine (déclenchés par seuil de bananes)
+  paliers:[
+    {n:1, name:"Le petit service",          ic:"🤝", at:0,      ingr:"Pulpe vitale"},
+    {n:2, name:"Le petit business",         ic:"💰", at:350,    ingr:"Pièce jaune"},
+    {n:3, name:"L'empire banane",           ic:"🏦", at:9000,   ingr:"Graine prime"},
+    {n:4, name:"L'obsession",               ic:"😵", at:200000, ingr:"Contrat simiesque"},
+    {n:5, name:"La grande usine",           ic:"🏭", at:5e6,    ingr:"Sceau d'État"},
+    {n:6, name:"Le laboratoire secret",     ic:"🧪", at:1.2e8,  ingr:"Brevet nano"},
+    {n:7, name:"La conscience artificielle",ic:"🤖", at:3e9,    ingr:"Cellule potassium"},
+    {n:8, name:"Le vrai plan",              ic:"😈", at:8e10,   ingr:"Coeur quantique"},
+  ],
+
+  // assemblage final
+  nano:{ cost:1e12, name:"NANO BANANA" },
+
+  // améliorations : clickAdd / clickMult / clickFrac / global / producer(target)
+  upgrades:[
+    // --- clic ---
+    {id:"u_glove",  name:"Gants en peau de banane", ic:"🧤", desc:"+1 banane / clic",       cost:100,    type:"clickAdd",  val:1},
+    {id:"u_cyglove",name:"Cyber-gant",              ic:"🧤", desc:"Bananes / clic ×2",       cost:1200,   type:"clickMult", val:2},
+    {id:"u_thumb",  name:"Pouce bionique",          ic:"✋", desc:"Bananes / clic ×2",       cost:30000,  type:"clickMult", val:2},
+    {id:"u_arm",    name:"Bras nano",               ic:"🦾", desc:"Bananes / clic ×2",       cost:8e5,    type:"clickMult", val:2},
+    {id:"u_live",   name:"Clic vivant",             ic:"💢", desc:"Le clic gagne +5% du BPS",cost:250000, type:"clickFrac", val:0.05},
+    {id:"u_potas",  name:"Clic potassié",           ic:"🔋", desc:"Bananes / clic ×3",       cost:4e7,    type:"clickMult", val:3},
+    {id:"u_singu",  name:"Doigt singularité",       ic:"🌀", desc:"Bananes / clic ×3",       cost:5e9,    type:"clickMult", val:3},
+    // --- multiplicateurs globaux ---
+    {id:"u_fert",   name:"Engrais magique",         ic:"🌟", desc:"Toute la production ×2",  cost:7000,   type:"global", val:2},
+    {id:"u_photo",  name:"Photosynthèse 2.0",       ic:"☀️", desc:"Toute la production ×2",  cost:180000, type:"global", val:2},
+    {id:"u_horm",   name:"Hormone de croissance",   ic:"🧬", desc:"Toute la production ×2",  cost:4.5e6,  type:"global", val:2},
+    {id:"u_cata",   name:"Catalyseur quantique",    ic:"⚛️", desc:"Toute la production ×2",  cost:1.2e8,  type:"global", val:2},
+    {id:"u_bless",  name:"Bénédiction du Grand Régime",ic:"🌈",desc:"Toute la production ×3",cost:3.5e9,  type:"global", val:3},
+    {id:"u_toe",    name:"Théorie du Tout bananier",ic:"🌌", desc:"Toute la production ×3",  cost:2e11,   type:"global", val:3},
+    // --- producteurs ciblés (req : 10 possédés) ---
+    {id:"p_hand",   name:"Gloutonnerie",            ic:"🍽️", desc:"Main cueilleuse ×2",      cost:500,    type:"producer", target:"hand",  req:10},
+    {id:"p_monkey", name:"Syndicat des singes",     ic:"🐵", desc:"Singe employé ×2",        cost:5000,   type:"producer", target:"monkey",req:10},
+    {id:"p_farm",   name:"Irrigation goutte-à-goutte",ic:"🚿",desc:"Bananeraie ×2",          cost:55000,  type:"producer", target:"farm",  req:10},
+    {id:"p_green",  name:"Climat contrôlé",         ic:"🌡️", desc:"Serre hydroponique ×2",   cost:600000, type:"producer", target:"green", req:10},
+    {id:"p_drone",  name:"Essaim de drones",        ic:"📡", desc:"Drone récolteur ×2",      cost:6.5e6,  type:"producer", target:"drone", req:10},
+    {id:"p_plant",  name:"Chaîne robotisée",        ic:"🦿", desc:"Usine à bananes ×2",      cost:1e8,    type:"producer", target:"plant", req:10},
+    {id:"p_lab",    name:"CRISPR-banane",           ic:"🧫", desc:"Labo génétique ×2",       cost:1e9,    type:"producer", target:"lab",   req:10},
+    {id:"p_ai",     name:"Réseau neuronal jaune",   ic:"🕸️", desc:"IA bananière ×2",         cost:1.6e10, type:"producer", target:"ai",    req:10},
+  ],
+
+  // banane dorée
+  golden:{ minDelay:75, maxDelay:240, lifetime:13 },
+
+  // succès (check(s) → bool)
+  achievements:[
+    {id:"a_click1",  ic:"👆", name:"Premier clic",        check:s=>s.totalClicks>=1},
+    {id:"a_click100",ic:"👆", name:"100 clics",           check:s=>s.totalClicks>=100},
+    {id:"a_click1k", ic:"🔥", name:"1 000 clics",         check:s=>s.totalClicks>=1000},
+    {id:"a_click10k",ic:"💥", name:"10 000 clics",        check:s=>s.totalClicks>=10000},
+    {id:"a_b100",    ic:"🍌", name:"100 bananes",         check:s=>s.totalEarned>=100},
+    {id:"a_b10k",    ic:"🍌", name:"10 K bananes",        check:s=>s.totalEarned>=1e4},
+    {id:"a_b1m",     ic:"🍌", name:"1 M bananes",         check:s=>s.totalEarned>=1e6},
+    {id:"a_b1b",     ic:"🍌", name:"1 Md bananes",        check:s=>s.totalEarned>=1e9},
+    {id:"a_b1t",     ic:"🍌", name:"1 000 Md bananes",    check:s=>s.totalEarned>=1e12},
+    {id:"a_first",   ic:"🛒", name:"Premier achat",       check:s=>countProducers(s)>=1},
+    {id:"a_own50",   ic:"📦", name:"50 producteurs",      check:s=>countProducers(s)>=50},
+    {id:"a_own200",  ic:"🏗️", name:"200 producteurs",     check:s=>countProducers(s)>=200},
+    {id:"a_oneeach", ic:"🌈", name:"Un de chaque",        check:s=>CONFIG.producers.every(p=>(s.producers[p.id]||0)>=1)},
+    {id:"a_upg5",    ic:"✨", name:"5 améliorations",     check:s=>Object.keys(s.upgrades).length>=5},
+    {id:"a_gold1",   ic:"🌟", name:"1 banane dorée",      check:s=>s.goldenClicks>=1},
+    {id:"a_gold7",   ic:"⭐", name:"7 bananes dorées",    check:s=>s.goldenClicks>=7},
+    {id:"a_gold77",  ic:"💫", name:"77 bananes dorées",   check:s=>s.goldenClicks>=77},
+    {id:"a_era4",    ic:"🐒", name:"Singes embauchés",    check:s=>s.palier>=4},
+    {id:"a_era6",    ic:"🔬", name:"Banane-science",      check:s=>s.palier>=6},
+    {id:"a_era8",    ic:"🌌", name:"Banane cosmique",     check:s=>s.palier>=8},
+    {id:"a_offline", ic:"😴", name:"Gros lot hors-ligne", check:s=>s.bigOffline},
+    {id:"a_win",     ic:"🏆", name:"NANO BANANA",         check:s=>s.won},
+    {id:"a_prestige",ic:"♻️", name:"Premier compostage",  check:s=>s.prestiges>=1},
+  ],
+
+  // ---- améliorations : activables/désactivables par flag ----
+  features:{ frenzy:true, lore:true, titles:true, hidden:true, rotten:true,
+             synergies:true, talents:true, special:true, events:true, weather:true, quests:true,
+             story:true, boss:true },
+
+  // A2 — synergies entre producteurs (chaque unité de source booste la cible)
+  synergies:[
+    { source:"monkey", target:"farm",  perUnit:0.01,  label:"Singes" },
+    { source:"plant",  target:"drone", perUnit:0.005, label:"Usines" },
+    { source:"lab",    target:"click", perUnit:0.02,  label:"Labos" },   // booste le BPC
+  ],
+
+  // A3 — arbre de talents ADN (nœuds à prérequis)
+  talents:[
+    {id:"b1",branch:"bio",  ic:"🌱",name:"Pouce vert",     cost:1, req:[],     eff:{prodMult:1.05}, desc:"Prod +5%"},
+    {id:"b2",branch:"bio",  ic:"🧪",name:"Engrais ADN",    cost:3, req:["b1"], eff:{prodMult:1.10}, desc:"Prod +10%"},
+    {id:"b3",branch:"bio",  ic:"🌳",name:"Permaculture",   cost:6, req:["b2"], eff:{prodMult:1.15}, desc:"Prod +15%"},
+    {id:"b4",branch:"bio",  ic:"♾️",name:"Symbiose totale",cost:25,req:["b3"], eff:{prodMult:1.5},  desc:"Prod ×1,5 (keystone)"},
+    {id:"f1",branch:"force",ic:"✊",name:"Poigne",         cost:1, req:[],     eff:{clickMult:1.1}, desc:"Clic +10%"},
+    {id:"f2",branch:"force",ic:"⏱️",name:"Endurance",      cost:3, req:["f1"], eff:{frenzyDur:3},   desc:"Frénésie +3 s"},
+    {id:"f3",branch:"force",ic:"💥",name:"Coup de maître", cost:6, req:["f2"], eff:{clickMult:1.5}, desc:"Clic ×1,5"},
+    {id:"f4",branch:"force",ic:"🤜",name:"Main divine",    cost:25,req:["f3"], eff:{clickMult:3},   desc:"Clic ×3 (keystone)"},
+    {id:"t1",branch:"tech", ic:"🔋",name:"Batterie",       cost:1, req:[],     eff:{offlineCap:4},  desc:"Cap hors-ligne +4 h"},
+    {id:"t2",branch:"tech", ic:"📡",name:"Radar doré",     cost:3, req:["t1"], eff:{goldenFreq:0.8},desc:"Dorées +25% fréquentes"},
+    {id:"t3",branch:"tech", ic:"♻️",name:"Compost optimisé",cost:6,req:["t2"], eff:{adnGain:1.5},   desc:"Gain d'ADN ×1,5"},
+    {id:"t4",branch:"tech", ic:"⚛️",name:"Singularité",    cost:25,req:["t3"], eff:{goldenFreq:0.6},desc:"Dorées ×1,7 (keystone)"},
+  ],
+  branches:{ bio:{ic:"🌿",name:"Bio"}, force:{ic:"👊",name:"Force"}, tech:{ic:"⚡",name:"Tech"} },
+
+  // A4 — bananes spéciales rares (bonus permanents, 1 fois par partie)
+  special:[
+    {id:"blue",  ic:"🔵", name:"Banane bleue",       desc:"+5% prod globale",            eff:{prodMult:1.05}},
+    {id:"square",ic:"⬛", name:"Banane carrée",       desc:"+10% au clic",                eff:{clickMult:1.10}},
+    {id:"radio", ic:"☢️", name:"Banane radioactive", desc:"Bananes dorées 2× fréquentes",eff:{goldenFreq:0.5}},
+    {id:"ghost", ic:"👻", name:"Banane fantôme",     desc:"+1% prod par succès",         eff:{achPower:0.01}},
+  ],
+  specialChance:0.06,   // proba qu'un spawn de banane "dorée" soit en fait une spéciale non encore collectée
+
+  // B1 — événements à choix
+  events:[
+    {id:"deal",  text:"🐒 Un singe propose un deal.", a:{label:"Prod ×2 (60 s)",eff:{prodFrenzyAlt:[2,60]}}, b:{label:"Gros lot de bananes",eff:{bananasMin:600}}},
+    {id:"serum", text:"🧪 Un savant fou veut tester un sérum.", a:{label:"+12% prod permanente (-40% bananes)",eff:{permaProd:0.12,bananasMul:0.6}}, b:{label:"Refuser poliment",eff:{}}},
+    {id:"crate", text:"📦 Une caisse mystère traîne là.", a:{label:"L'ouvrir (jackpot ou rien)",eff:{gamble:true}}, b:{label:"La revendre (gain sûr)",eff:{bananasMin:120}}},
+    {id:"storm2",text:"⛈️ Tempête de potassium en approche.", a:{label:"Foncer dehors (frénésie auto)",eff:{prodFrenzyAlt:[7,20]}}, b:{label:"Rester à l'abri (rien)",eff:{}}},
+  ],
+  eventDelay:{ min:300, max:600 },   // secondes entre événements
+
+  // B2 — météo bananière (une active à la fois, change toutes les quelques minutes)
+  weather:[
+    {id:"clear", ic:"⛅", name:"Dégagé",          eff:{}},
+    {id:"sun",   ic:"☀️", name:"Ensoleillé",      eff:{prodMult:1.10}},
+    {id:"rain",  ic:"🍌", name:"Pluie de bananes",eff:{prodMult:1.15}},
+    {id:"drought",ic:"🌵",name:"Sécheresse",      eff:{prodMult:0.80}},
+    {id:"night", ic:"🌙", name:"Nuit",            eff:{goldenFreq:0.6}},
+    {id:"storm", ic:"⛈️", name:"Orage techno",    eff:{frenzyGain:2}},
+  ],
+  weatherDelay:{ min:180, max:360 },
+
+  // B3 — quêtes journalières (3/jour)
+  questPool:[
+    {id:"click",  ic:"👆", text:"Faire {t} clics",            target:400, kind:"clicks"},
+    {id:"buy",    ic:"🛒", text:"Acheter {t} producteurs",    target:10,  kind:"buys"},
+    {id:"gold",   ic:"🌟", text:"Cliquer {t} bananes dorées", target:3,   kind:"golds"},
+    {id:"frenzy", ic:"👊", text:"Déclencher {t} frénésies",   target:2,   kind:"frenzies"},
+    {id:"bps",    ic:"⚙️", text:"Atteindre {t} 🍌/s",         target:1000,kind:"bps"},
+  ],
+  questReward:{ adn:1 },
+
+  // A1 — jauge de Frénésie (combo de clic)
+  frenzy:{ gainPerClick:0.05, decayPerSec:0.04, idleDelay:0.5, mult:7, duration:8 },
+
+  // C1 — carnet d'Amine (1 message par palier/chapitre) — voix d'Amine
+  lore:{
+    1:"Mlih, t'as commencé ! Ramène-m'en encore, fais-moi confiance khoya, c'est rien du tout.",
+    2:"Eh, en fait on peut les vendre ! L'argent qui rentre… ça me plaît, ça. Arrête pas surtout.",
+    3:"Regarde-moi ça, ça pousse tout seul maintenant. On devient quelqu'un, sahbi. J'en veux plus.",
+    4:"Je dors plus, khoya. Je pense qu'aux bananes, jour et nuit. C'est… normal, non ? Ramène, ramène.",
+    5:"À l'échelle industrielle maintenant. Plus rien ne m'arrête. Pourquoi tu me regardes comme ça ? Continue.",
+    6:"J'ai monté un petit labo… un projet à moi. T'occupe pas des détails. Toi, tu ramènes les bananes.",
+    7:"L'IA tourne. Elle pense banane, elle rêve banane. Wallah, des fois je sais plus qui réfléchit… moi ou elle.",
+    8:"On y est presque. Tu vas enfin comprendre pourquoi je t'ai fait ramasser tout ça. Encore un effort, miskine…",
+    win:"On la partage finalement, cette Nano Banana. Moitié-moitié, entre potes. Saha ! 🍌",
+  },
+
+  // C2 — titres évolutifs (par nombre de compostages)
+  titles:[
+    {at:0,t:"Mangeur de banane"}, {at:1,t:"Apprenti Bananier"}, {at:3,t:"Maître Cavendish"},
+    {at:5,t:"Baron de la Banane"}, {at:10,t:"Banane Suprême"}, {at:20,t:"Seigneur du Régime"},
+    {at:50,t:"Dieu Cavendish"}, {at:100,t:"L'Entité Bananière"},
+  ],
+
+  // C3 — succès cachés (conditions absurdes, non annoncées)
+  hidden:[
+    {id:"h_404",   ic:"🔍", name:"Erreur 404 : banane introuvable", desc:"Cliquer exactement 404 fois",        check:s=>s.totalClicks===404},
+    {id:"h_idle",  ic:"😴", name:"Patient zéro",                    desc:"Rester 10 min sans cliquer",          check:s=>idleSec>=600 && s.totalClicks>0},
+    {id:"h_round", ic:"💯", name:"Centenaire bananier",             desc:"Posséder 100 d'un même producteur",   check:s=>CONFIG.producers.some(p=>(s.producers[p.id]||0)>=100)},
+    {id:"h_g777",  ic:"🎰", name:"Numéro de chance",                desc:"Cliquer 777 bananes dorées",          check:s=>s.goldenClicks>=777},
+    {id:"h_night", ic:"🌙", name:"Insomniaque",                     desc:"Jouer entre 3 h et 4 h du matin",     check:s=>isNightHour()},
+    {id:"h_return",ic:"👋", name:"Le retour",                       desc:"Revenir après +48 h d'absence",       check:s=>s.bigReturn48},
+    {id:"h_trade", ic:"💾", name:"Trader de bananes",               desc:"Utiliser l'export/import du save",    check:s=>s.usedTransfer},
+  ],
+
+  // B4 — banane pourrie (golden « maléfique »)
+  rotten:{ chance:0.18, malusProd:0.5, malusDur:30 },
+
+  // ============ HISTOIRE & BOSS (Amine) ============
+  assets:{
+    moods:{
+      friendly:"assets/amine-friendly.png",   // intro / réconciliation
+      joyeux:  "assets/amine-joyeux.png",      // chapitres 1-3
+      greedy:  "assets/amine-greedy.png",      // chapitres 4-6
+      mechant: "assets/amine-mechant.png",     // chapitres 7-8 / trahison / début de combat
+      furieux: "assets/amine-furieux.png",     // combat phase 2
+      peureux: "assets/amine-peureux.png",     // combat phase 3
+      moqueur: "assets/amine-moqueur.png",     // bombe tranchée / défaite
+      boss:    "assets/amine-nano-banana.png", // sprite du boss
+    },
+    fallback:["assets/amine2.png","assets/amine.png"],   // repli si une humeur manque
+  },
+  story:{
+    intro:[
+      "Wesh khoya, ça va ? Écoute, j'ai un projet de fou. J'ai besoin que tu me ramasses des bananes. Pas deux-trois, hein… toutes. TOUTES les bananes.",
+      "T'inquiète, fais-moi confiance, c'est pour la science. Yallah, clique sur la banane, tu vas voir, c'est easy.",
+      "Saha ! Vas-y, ramène-moi un max de bananes.",
+    ],
+    betrayal:[
+      "Hahaha… Saha khoya ! T'as fait tout le sale boulot à ma place. Miskine, t'as rien capté.",
+      "Tu croyais qu'on était potes ? Cette puissance… elle est à MOI maintenant.",
+      "Et tes bananes aussi, je les prends. Toutes. Quoi ? Je suis arabe, c'est dans le contrat. 😏",
+      "Yallah, regarde bien. Amine, c'est fini. Maintenant y'a que… AMINE-BANANE.",
+    ],
+    taunts:{
+      start:"Allez, montre-moi ce que t'as ! Tu vas rien faire, wallah.",
+      p2:["Sérieux ?! Tu me touches vraiment là ?! Bon… maintenant je rigole plus, khoya.","Tranche, tranche… plus vite que ça !"],
+      p3:["Wesh wesh wesh ?! C'est pas possible !","Les bombes, allez les bombes ! Touche une bombe, juste une, pour moi !"],
+      bomb:"Hahaha ! Voilà ! Je te l'avais dit !",
+    },
+    defeat:"Hahaha ! Je te l'avais dit, khoya. Retourne ramasser tes bananes, miskine. Et reviens quand t'es prêt… si t'en as les moyens.",
+    victory:[
+      "Stooop ! Khlas ! Wallah khlas, t'as gagné…",
+      "Bon… saha khoya. T'es plus fort que moi, je l'avoue. Je m'excuse, sérieux.",
+      "Allez, on la partage cette Nano Banana ? Moitié-moitié, entre potes. Saha ! 🍌",
+    ],
+  },
+  boss:{
+    hp:100, shotDamage:20, lives:3, maxLives:5,
+    chargeMax:100, chargePerBanana:8, comboBonus:2,
+    sliceRadius:34, retryCostFrac:0.25, restoreBonus:1.5,
+    phases:[
+      { hpTo:66, rate:2.0, bombPct:0.15, fall:[95,150] },
+      { hpTo:33, rate:3.0, bombPct:0.20, fall:[140,210] },
+      { hpTo:0,  rate:4.0, bombPct:0.25, fall:[190,280] },
+    ],
+    salvo:{ every:10, count:3 },
+  },
+  combatUpgrades:[
+    {id:"life",  ic:"🍌❤️", name:"Vie supplémentaire", desc:"+1 vie (max 5)",        cost:8e10, eff:{life:1}},
+    {id:"magnet",ic:"🧲",   name:"Aimant à bananes",    desc:"Tranche plus large",     cost:3e10, eff:{radius:16}},
+    {id:"cannon",ic:"⚡",   name:"Canon survitaminé",   desc:"+4 charge par banane",   cost:3e10, eff:{charge:4}},
+    {id:"ammo",  ic:"💥",   name:"Munitions lourdes",   desc:"+8 dégâts par tir",      cost:8e10, eff:{damage:8}},
+    {id:"vest",  ic:"🛡️",   name:"Gilet anti-bombe",    desc:"Absorbe la 1re bombe",   cost:3e10, eff:{vest:1}},
+    {id:"slow",  ic:"🐢",   name:"Ralentisseur",        desc:"Objets −20% plus lents", cost:8e10, eff:{slow:0.8}},
+  ],
+};
+
+/* =========================================================================
+   ÉTAT
+   ========================================================================= */
+function defaultState(){
+  return {
+    v:CONFIG.saveVersion,
+    bananas:0, totalEarned:0, totalClicks:0,
+    producers:{}, upgrades:{}, achievements:{},
+    palier:1, ingredients:{},
+    adn:0, prestiges:0,
+    goldenClicks:0, bigOffline:false,
+    won:false, winStats:null,
+    startTime:Date.now(), playMs:0, lastSeen:Date.now(),
+    buyAmount:1, sound:true,
+    ui:{},                 // disposition des widgets (position / ouvert / replié)
+    lore:{},               // entrées de journal débloquées
+    usedTransfer:false, bigReturn48:false,
+    talents:{},            // A3 — nœuds ADN achetés
+    collection:{},         // A4 — bananes spéciales collectées
+    permaProd:0,           // B1 — bonus de prod permanent (événements)
+    daily:null,            // B3 — quêtes du jour
+    // ---- histoire & boss ----
+    introSeen:false,       // intro d'Amine vue
+    bossWon:false,         // Amine-Banane vaincu (vraie fin)
+    bossAttempts:0,        // tentatives de combat
+    combat:{},             // améliorations de combat achetées
+    amineStolen:0,         // bananes volées par Amine (rendues à la victoire)
+  };
+}
+let S = defaultState();
+
+// timers d'effets temporaires (en secondes, hors save)
+let prodFrenzy=0, clickFrenzy=0, rotPenalty=0;
+let goldenTimer=0, goldenVisible=false, goldenLife=0, goldenEvil=false, goldenSpecial=null;
+let weatherCur=null, weatherTimer=0, eventTimer=0, eventBuffMult=1, eventBuffTimer=0;
+
+/* ----- helpers d'état ----- */
+function countProducers(s){ let n=0; for(const k in s.producers) n+=s.producers[k]; return n; }
+const PMAP={}; CONFIG.producers.forEach(p=>PMAP[p.id]=p);
+const UMAP={}; CONFIG.upgrades.forEach(u=>UMAP[u.id]=u);
+
+/* =========================================================================
+   CALCULS DÉRIVÉS
+   ========================================================================= */
+function achGotCount(){ let n=0; for(const k in S.achievements) n++; return n; }
+
+function globalMult(){
+  let m = 1;
+  m *= Math.pow(CONFIG.eraBonusPerStep, S.palier-1);            // paliers franchis
+  for(const id in S.upgrades){ const u=UMAP[id]; if(u&&u.type==="global") m*=u.val; }
+  m *= 1 + (CONFIG.achBonus+specialAchPower())*achGotCount();   // succès (+ A4 banane fantôme)
+  m *= 1 + CONFIG.adnBonus*S.adn;                               // ADN permanent
+  m *= talentProdMult()*specialProdMult();                      // A3 talents + A4 spéciales
+  m *= 1 + (S.permaProd||0);                                    // B1 — bonus permanent d'événement
+  { const w=weatherEff(); if(w.prodMult) m*=w.prodMult; }       // B2 — météo
+  if(eventBuffTimer>0) m *= eventBuffMult;                      // B1 — buff temporaire d'événement
+  if(prodFrenzy>0) m *= 7;                                      // frénésie ×7 (banane dorée)
+  if(rotPenalty>0) m *= CONFIG.rotten.malusProd;               // B4 — malus banane pourrie
+  return m;
+}
+function producerMult(id){
+  let m=1;
+  for(const uid in S.upgrades){ const u=UMAP[uid]; if(u&&u.type==="producer"&&u.target===id) m*=u.val; }
+  if(CONFIG.features.synergies) m*=synergyMult(id);            // A2
+  return m;
+}
+
+/* ---- agrégateurs lot v2 (talents / spéciales / météo / synergies) ---- */
+function synergyMult(targetId){ let m=1; for(const s of CONFIG.synergies){ if(s.target===targetId) m+=(S.producers[s.source]||0)*s.perUnit; } return m; }
+function talentSum(key,base,mul){ let v=base; for(const t of CONFIG.talents){ if(S.talents[t.id]&&t.eff[key]!=null){ v = mul? v*t.eff[key] : v+t.eff[key]; } } return v; }
+function specialSum(key,base,mul){ let v=base; for(const s of CONFIG.special){ if(S.collection[s.id]&&s.eff[key]!=null){ v = mul? v*s.eff[key] : v+s.eff[key]; } } return v; }
+function talentProdMult(){ return CONFIG.features.talents? talentSum("prodMult",1,true):1; }
+function talentClickMult(){ return CONFIG.features.talents? talentSum("clickMult",1,true):1; }
+function talentFrenzyDur(){ return CONFIG.features.talents? talentSum("frenzyDur",0,false):0; }
+function talentOfflineCap(){ return CONFIG.features.talents? talentSum("offlineCap",0,false):0; }
+function talentGoldenFreq(){ return CONFIG.features.talents? talentSum("goldenFreq",1,true):1; }
+function talentAdnGain(){ return CONFIG.features.talents? talentSum("adnGain",1,true):1; }
+function specialProdMult(){ return CONFIG.features.special? specialSum("prodMult",1,true):1; }
+function specialClickMult(){ return CONFIG.features.special? specialSum("clickMult",1,true):1; }
+function specialGoldenFreq(){ return CONFIG.features.special? specialSum("goldenFreq",1,true):1; }
+function specialAchPower(){ return CONFIG.features.special? specialSum("achPower",0,false):0; }
+function weatherEff(){ return (CONFIG.features.weather && weatherCur && weatherCur.eff)||{}; }
+function rawBps(){
+  let s=0;
+  for(const p of CONFIG.producers) s += (S.producers[p.id]||0)*p.rate*producerMult(p.id);
+  return s;
+}
+function perSecond(){ return rawBps()*globalMult(); }
+
+function clickAddTotal(){ let a=0; for(const id in S.upgrades){const u=UMAP[id]; if(u&&u.type==="clickAdd")a+=u.val;} return a; }
+function clickMultTotal(){ let m=1; for(const id in S.upgrades){const u=UMAP[id]; if(u&&u.type==="clickMult")m*=u.val;} return m; }
+function clickFracTotal(){ let f=0; for(const id in S.upgrades){const u=UMAP[id]; if(u&&u.type==="clickFrac")f+=u.val;} return f; }
+function clickPower(){
+  let base = (CONFIG.click.base + clickAddTotal())*clickMultTotal()*globalMult();
+  base *= talentClickMult()*specialClickMult();                 // A3 talents + A4 spéciales
+  if(CONFIG.features.synergies) base *= synergyMult("click");   // A2 — synergie Labos → clic
+  base += clickFracTotal()*perSecond();
+  if(clickFrenzy>0) base *= 77;                                 // "clic chargé" ×77 (banane dorée)
+  if(frenzyTimer>0) base *= CONFIG.frenzy.mult;                 // A1 — frénésie de clic
+  return base;
+}
+
+// coût d'achat de k exemplaires d'un producteur déjà possédé "owned" fois
+function bulkCost(base, owned, k){
+  const g=CONFIG.costGrowth;
+  return base*Math.pow(g,owned)*(Math.pow(g,k)-1)/(g-1);
+}
+function maxAffordable(base, owned, bananas){
+  const g=CONFIG.costGrowth;
+  // résout le plus grand k tel que bulkCost <= bananas
+  const start = base*Math.pow(g,owned);
+  if(bananas<start) return 0;
+  const k = Math.floor( Math.log( bananas*(g-1)/start + 1 )/Math.log(g) );
+  return Math.max(0,k);
+}
+function buyQty(p){
+  const owned=S.producers[p.id]||0;
+  if(S.buyAmount==="max"){ return Math.max(1, maxAffordable(p.cost,owned,S.bananas)); }
+  return S.buyAmount;
+}
+
+/* =========================================================================
+   FORMATAGE DES NOMBRES
+   ========================================================================= */
+const SUF=["","K","M","Md","T","Qa","Qi","Sx","Sp","Oc","No","Dc"];
+function fmt(n){
+  if(!isFinite(n)) return "∞";
+  if(n<0) return "-"+fmt(-n);
+  if(n<1000) return (Math.floor(n)===n? n.toString() : n.toFixed(1));
+  let i=Math.floor(Math.log10(n)/3);
+  if(i>=SUF.length) return n.toExponential(2).replace("e+","e");
+  let v=n/Math.pow(10,i*3);
+  let str=(v>=100? v.toFixed(0) : v.toFixed(2));
+  if(str.indexOf(".")>=0) str=str.replace(/\.?0+$/,"");   // ne retire les zéros qu'après la virgule
+  return str+" "+SUF[i];
+}
+function fmtTime(ms){
+  let s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60); s=s%60;
+  return (h? h+"h ":"")+(m||h?m+"m ":"")+s+"s";
+}
+
+/* =========================================================================
+   SAUVEGARDE / CHARGEMENT / OFFLINE
+   ========================================================================= */
+// checksum djb2 (anti-édition triviale du localStorage)
+function checksum(str){ let h=5381; for(let i=0;i<str.length;i++){ h=((h<<5)+h+str.charCodeAt(i))>>>0; } return h; }
+let saveTampered=false;
+
+function save(){
+  S.lastSeen=Date.now();
+  try{
+    const body=JSON.stringify(S);
+    localStorage.setItem(CONFIG.saveKey, JSON.stringify({ d:body, k:checksum(body) }));
+  }catch(e){}
+}
+function load(){
+  let raw; try{ raw=localStorage.getItem(CONFIG.saveKey); }catch(e){}
+  if(!raw) return false;
+  try{
+    let d, o=JSON.parse(raw);
+    if(o && typeof o.d==="string" && "k" in o){           // format avec checksum
+      if(checksum(o.d)!==o.k) saveTampered=true;
+      d=JSON.parse(o.d);
+    } else { d=o; }                                        // ancien format / import direct
+    S=Object.assign(defaultState(), d);
+    S.producers=d.producers||{}; S.upgrades=d.upgrades||{};
+    S.achievements=d.achievements||{}; S.ingredients=d.ingredients||{};
+    S.ui=d.ui||{}; S.lore=d.lore||{};
+    S.talents=d.talents||{}; S.collection=d.collection||{}; S.daily=d.daily||null;
+    S.combat=d.combat||{};
+    return true;
+  }catch(e){ return false; }
+}
+function applyOffline(){
+  const now=Date.now();
+  let dt=(now-(S.lastSeen||now))/1000;
+  if(dt<10) return;
+  if(dt>=48*3600) S.bigReturn48=true;   // succès caché « Le retour »
+  const cap=(CONFIG.offlineCapHours+talentOfflineCap())*3600;
+  const capped=Math.min(dt,cap);
+  const gain=perSecond()*capped;
+  if(gain<=0) return;
+  S.bananas+=gain; S.totalEarned+=gain;
+  if(gain>=perSecond()*600) S.bigOffline=true; // ≥10 min de prod
+  overlayWelcome(dt,capped,gain);
+}
+
+/* =========================================================================
+   ÉCHELLE / ÈRE / THÈME
+   ========================================================================= */
+let dbgEra=null;   // override debug du thème (null = auto)
+function visualEra(){
+  if(dbgEra) return dbgEra;
+  // ère visuelle (1..5) pilotée par les producteurs avancés possédés
+  if((S.producers.worm||0)>0 || S.prestiges>0) return 5;
+  if((S.producers.ai||0)>0)   return 4;
+  if((S.producers.plant||0)>0)return 3;
+  if((S.producers.green||0)>0)return 2;
+  return 1;
+}
+let curEra=0;
+function refreshEra(){
+  const e=visualEra();
+  if(e!==curEra){ curEra=e; document.body.setAttribute("data-era", e); setBananaArt(e); }
+}
+function checkPaliers(){
+  let changed=false; const newMsgs=[];
+  for(const p of CONFIG.paliers){
+    if(S.palier<p.n && S.totalEarned>=p.at){
+      S.palier=p.n; S.ingredients[p.n]=true; changed=true;
+      celebrate(p);
+      toast(`${p.ic} Chapitre ${p.n} — ${p.name}`);
+      if(CONFIG.lore[p.n]){ S.lore[p.n]=true; newMsgs.push(CONFIG.lore[p.n]); }
+    }
+  }
+  if(changed){
+    renderLadder(); renderAssemble(); renderJournal();
+    // Amine s'adresse au joueur à chaque chapitre débloqué (Acte II)
+    if(CONFIG.features.story && newMsgs.length && amineOverlay.classList.contains("hidden") && !S.won){
+      const mood=moodForChapter(S.palier);
+      if(S.palier>=7) preloadPortraits(["mechant","boss"]);   // on s'approche du boss
+      setTimeout(()=>amineDialog(newMsgs, {mood}), 700);
+    }
+  }
+}
+
+/* ---- banane centrale (chargement image + retrait du fond damier + crossfade) ---- */
+const artBox=document.getElementById("bananaArt");
+const SKIN={1:"assets/banana-1.png",2:"assets/banana-2.png",3:"assets/banana-3.png",4:"assets/banana-4.png",5:"assets/banana-5.png"};
+const artCache={}; // era -> canvas (ou false si image absente)
+function processImage(img){
+  // dessine en 512² puis retire le fond damier clair par flood-fill depuis les bords
+  const N=512, c=document.createElement("canvas"); c.width=c.height=N;
+  const ctx=c.getContext("2d"); ctx.drawImage(img,0,0,N,N);
+  let data; try{ data=ctx.getImageData(0,0,N,N); }catch(e){ return c; } // si CORS bloque, on garde l'image telle quelle
+  const d=data.data;
+  const isBg=(i)=>{ const r=d[i],g=d[i+1],b=d[i+2],a=d[i+3];
+    if(a<10) return true;
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+    return mx>165 && (mx-mn)<38; }; // gris/blanc clair peu saturé = damier
+  const stack=[], seen=new Uint8Array(N*N);
+  for(let x=0;x<N;x++){ stack.push(x,(N-1)*N+x); }
+  for(let y=0;y<N;y++){ stack.push(y*N,y*N+N-1); }
+  while(stack.length){
+    const p=stack.pop(); if(seen[p])continue; seen[p]=1;
+    const i=p*4; if(!isBg(i))continue;
+    d[i+3]=0;
+    const x=p%N, y=(p-x)/N;
+    if(x>0)stack.push(p-1); if(x<N-1)stack.push(p+1);
+    if(y>0)stack.push(p-N); if(y<N-1)stack.push(p+N);
+  }
+  ctx.putImageData(data,0,0);
+  return c;
+}
+function loadEra(e){
+  return new Promise(res=>{
+    if(artCache[e]!==undefined) return res(artCache[e]);
+    const img=new Image();
+    img.onload=()=>{ try{ artCache[e]=processImage(img); }catch(err){ artCache[e]=false; } res(artCache[e]); };
+    img.onerror=()=>{ artCache[e]=false; res(false); };
+    img.src=SKIN[e];
+  });
+}
+function setBananaArt(e){
+  loadEra(e).then(canvas=>{
+    artBox.style.opacity="0";
+    setTimeout(()=>{
+      artBox.innerHTML="";
+      if(canvas){ const cv=canvas.cloneNode(); cv.getContext("2d").drawImage(canvas,0,0); artBox.appendChild(cv); }
+      else{ const sp=document.createElement("span"); sp.className="emoji"; sp.textContent="🍌";
+            sp.style.filter="hue-rotate("+((e-1)*40)+"deg)"; artBox.appendChild(sp); }
+      artBox.style.opacity="1";
+    },180);
+  });
+}
+
+/* =========================================================================
+   RENDU (construction une fois, mise à jour par tick)
+   ========================================================================= */
+const elCount=document.getElementById("count");
+const elPersec=document.getElementById("persec");
+const elPerclick=document.getElementById("perclick");
+const producerList=document.getElementById("producerList");
+const upgradeList=document.getElementById("upgradeList");
+const upgEmpty=document.getElementById("upgEmpty");
+const achGrid=document.getElementById("achGrid");
+const hiddenGrid=document.getElementById("hiddenGrid");
+const journalEl=document.getElementById("journal");
+const titleEl=document.getElementById("title");
+const weatherEl=document.getElementById("weather");
+const questsEl=document.getElementById("quests");
+const collectionEl=document.getElementById("collection");
+const talentWrap=document.getElementById("talentWrap");
+const ladderSteps=document.getElementById("ladderSteps");
+const progFill=document.getElementById("progFill");
+const progLabel=document.getElementById("progLabel");
+const statsBox=document.getElementById("stats");
+
+const prodEls={};
+function buildProducers(){
+  producerList.innerHTML="";
+  CONFIG.producers.forEach(p=>{
+    const b=document.createElement("button"); b.className="card"; b.dataset.id=p.id;
+    b.innerHTML=`<span class="ic">${p.ic}</span>
+      <span class="body"><span class="nm">${p.name}</span><span class="ds">${p.flavor}</span>
+      <span class="rate">+${fmt(p.rate)} 🍌/s ch.</span></span>
+      <span class="right"><span class="cost"></span><br><span class="cnt">0</span></span>`;
+    b.addEventListener("click",()=>buyProducer(p.id));
+    producerList.appendChild(b); prodEls[p.id]=b;
+  });
+}
+function revealedProducer(p){ return S.totalEarned >= p.cost*0.5 || (S.producers[p.id]||0)>0; }
+
+// (re)déclenche une animation CSS ponctuelle, sauf au tout premier rendu / reduce-motion
+let firstPaint=true;
+function retrigger(el,cls){ if(firstPaint||REDUCE)return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+function updateProducers(){
+  CONFIG.producers.forEach(p=>{
+    const b=prodEls[p.id];
+    if(!revealedProducer(p)){ b.style.display="none"; b._shown=false; return; }
+    if(!b._shown){ b.style.display=""; retrigger(b,"reveal"); b._shown=true; }
+    const owned=S.producers[p.id]||0;
+    const k=buyQty(p);
+    const cost=bulkCost(p.cost,owned,k);
+    const ok=S.bananas>=cost && k>0;
+    b.querySelector(".cnt").textContent=owned;
+    b.querySelector(".rate").textContent="+"+fmt(p.rate*producerMult(p.id))+" 🍌/s ch.";  // inclut synergies/upgrades
+    const cE=b.querySelector(".cost");
+    cE.textContent=(S.buyAmount==="max"?`×${k} `:"")+fmt(cost)+" 🍌";
+    cE.classList.toggle("ok",ok);
+    if(ok && b._afford===false) retrigger(b,"afford");
+    b._afford=ok;
+    b.disabled=!ok;
+  });
+}
+
+const upgEls={};
+function buildUpgrades(){
+  upgradeList.innerHTML="";
+  CONFIG.upgrades.forEach(u=>{
+    const b=document.createElement("button"); b.className="card"; b.dataset.id=u.id;
+    b.innerHTML=`<span class="ic">${u.ic}</span>
+      <span class="body"><span class="nm">${u.name}</span><span class="ds">${u.desc}</span></span>
+      <span class="right"><span class="cost"></span></span>`;
+    b.addEventListener("click",()=>buyUpgrade(u.id));
+    upgradeList.appendChild(b); upgEls[u.id]=b;
+  });
+}
+function revealedUpgrade(u){
+  if(S.upgrades[u.id]) return false;
+  if(u.req){ const t=u.target; if((S.producers[t]||0) < u.req) return false; }
+  return S.totalEarned >= u.cost*0.4;
+}
+function updateUpgrades(){
+  let shown=0;
+  CONFIG.upgrades.forEach(u=>{
+    const b=upgEls[u.id];
+    if(!revealedUpgrade(u)){ b.style.display="none"; b._shown=false; return; }
+    shown++;
+    if(!b._shown){ b.style.display=""; retrigger(b,"reveal"); b._shown=true; }
+    const ok=S.bananas>=u.cost;
+    const cE=b.querySelector(".cost"); cE.textContent=fmt(u.cost)+" 🍌"; cE.classList.toggle("ok",ok);
+    if(ok && b._afford===false) retrigger(b,"afford");
+    b._afford=ok;
+    b.disabled=!ok;
+  });
+  upgEmpty.style.display= shown? "none":"block";
+}
+
+function buildAch(){
+  achGrid.innerHTML="";
+  CONFIG.achievements.forEach(a=>{
+    const d=document.createElement("div"); d.className="ach"; d.dataset.id=a.id;
+    d.title=a.name; d.textContent="🔒";
+    achGrid.appendChild(d);
+  });
+}
+function updateAch(){
+  CONFIG.achievements.forEach(a=>{
+    const d=achGrid.querySelector(`[data-id="${a.id}"]`);
+    if(S.achievements[a.id]){ d.classList.add("got"); d.textContent=a.ic; d.title=a.name; }
+  });
+  document.getElementById("achCount").textContent=achGotCount();
+  document.getElementById("achBonus").textContent=achGotCount();
+  updateHidden();
+}
+
+/* C3 — succès cachés */
+function buildHidden(){
+  hiddenGrid.innerHTML="";
+  CONFIG.hidden.forEach(a=>{
+    const d=document.createElement("div"); d.className="ach"; d.dataset.id=a.id; d.title="???"; d.textContent="❓";
+    hiddenGrid.appendChild(d);
+  });
+}
+function updateHidden(){
+  CONFIG.hidden.forEach(a=>{
+    const d=hiddenGrid.querySelector(`[data-id="${a.id}"]`); if(!d) return;
+    if(S.achievements[a.id]){ d.classList.add("got"); d.textContent=a.ic; d.title=a.name+" — "+a.desc; }
+  });
+}
+function isNightHour(){ try{ return new Date().getHours()===3; }catch(e){ return false; } }
+function checkHidden(){
+  if(!CONFIG.features.hidden) return;
+  CONFIG.hidden.forEach(a=>{
+    if(!S.achievements[a.id] && a.check(S)){
+      S.achievements[a.id]=true;
+      toast(`🕵️ Succès caché : ${a.name} !`);
+    }
+  });
+}
+
+/* C1 — journal du savant */
+function renderJournal(){
+  if(!CONFIG.features.lore){ journalEl.innerHTML=""; return; }
+  let html="";
+  CONFIG.paliers.forEach(p=>{
+    const got=S.lore[p.n], txt=CONFIG.lore[p.n];
+    html+=`<div class="entry ${got?"":"locked"}"><b>${p.ic} Palier ${p.n} — ${p.name}</b>${got?txt:"??? — franchis ce palier pour découvrir"}</div>`;
+  });
+  const w=S.lore.win;
+  html+=`<div class="entry ${w?"":"locked"}"><b>★ NANO BANANA</b>${w?CONFIG.lore.win:"??? — assemble la Nano Banana"}</div>`;
+  journalEl.innerHTML=html;
+}
+
+/* C2 — titres évolutifs */
+function currentTitle(){ let t=CONFIG.titles[0].t; for(const x of CONFIG.titles){ if(S.prestiges>=x.at) t=x.t; } return t; }
+function updateTitle(){
+  if(!titleEl) return;
+  if(!CONFIG.features.titles){ titleEl.style.display="none"; return; }
+  titleEl.textContent=currentTitle();
+}
+
+function renderLadder(){
+  ladderSteps.innerHTML="";
+  CONFIG.paliers.forEach(p=>{
+    const s=document.createElement("span"); s.className="step";
+    if(S.palier>p.n) s.classList.add("done");
+    if(S.palier===p.n) s.classList.add("current");
+    s.innerHTML=`${p.ic}<span>${S.palier>=p.n?p.name:"???"}</span>`;
+    ladderSteps.appendChild(s);
+  });
+}
+function updateProg(){
+  const next=CONFIG.paliers.find(p=>p.n===S.palier+1);
+  if(!next){
+    progFill.style.width="100%";
+    progLabel.textContent= S.palier>=8 ? "Échelle bananière complète ! 🌌" : "";
+    return;
+  }
+  const prev=CONFIG.paliers.find(p=>p.n===S.palier).at;
+  const pct=Math.max(0,Math.min(1,(S.totalEarned-prev)/(next.at-prev)));
+  progFill.style.width=(pct*100).toFixed(1)+"%";
+  progLabel.textContent=`${next.ic} ${next.name} — ${fmt(S.totalEarned)} / ${fmt(next.at)} 🍌`;
+}
+
+const assembleWrap=document.getElementById("assembleWrap");
+function renderAssemble(){
+  // 1) Boss déjà vaincu → rejouer le combat (défi)
+  if(S.bossWon){
+    assembleWrap.innerHTML=`<div class="assemble"><div class="ttl">🏆 Amine-Banane vaincu</div>
+      <button class="btn" id="btnReplay" style="margin-top:6px;background:#160f00;color:var(--gold)">⚔️ Rejouer le combat</button></div>`;
+    const r=document.getElementById("btnReplay"); if(r) r.addEventListener("click",()=>openBossPrep());
+    return;
+  }
+  // 2) Nano assemblée mais boss pas encore battu → réaffronter (re-paiement)
+  if(S.won){
+    const rc=Math.ceil(CONFIG.nano.cost*CONFIG.boss.retryCostFrac);
+    assembleWrap.innerHTML=`<div class="assemble"><div class="ttl">😈 Amine-Banane t'attend</div>
+      <div style="font-size:12px;font-weight:700;margin:6px 0;color:#160f00">Réactiver la Nano Banana : <b>${fmt(rc)}</b> 🍌</div>
+      <button class="btn" id="btnRefight" style="background:#160f00;color:var(--gold)">⚔️ RÉAFFRONTER</button></div>`;
+    const b=document.getElementById("btnRefight"); if(b) b.addEventListener("click",()=>{
+      if(S.bananas<rc){ toast("Pas assez de bananes pour réactiver 🍌"); return; }
+      S.bananas-=rc; updateAll(); save(); openBossPrep();
+    });
+    return;
+  }
+  // 3) Pas encore au palier 8
+  if(S.palier<8){ assembleWrap.innerHTML=""; return; }
+  // 4) Assemblage initial
+  assembleWrap.innerHTML=`<div class="assemble">
+    <div class="ttl">★ Assembler la NANO BANANA ★</div>
+    <div style="font-size:12px;font-weight:700;margin:6px 0;color:#160f00">Tous les ingrédients réunis. Coût final : <b id="nanoCost">${fmt(CONFIG.nano.cost)}</b> 🍌</div>
+    <button class="btn" id="btnAssemble" style="background:#160f00;color:var(--gold)">FUSIONNER 🍌⚛️</button>
+  </div>`;
+  document.getElementById("btnAssemble").addEventListener("click",tryAssemble);
+}
+
+function updateStats(){
+  const rows=[
+    ["⏱️ Temps de jeu", fmtTime(S.playMs)],
+    ["🍌 Bananes totales", fmt(S.totalEarned)],
+    ["👆 Clics", fmt(S.totalClicks)],
+    ["📦 Producteurs", fmt(countProducers(S))],
+    ["🌟 Bananes dorées", fmt(S.goldenClicks)],
+    ["🪜 Palier", S.palier+" / 8"],
+    ["🧬 ADN", fmt(S.adn)],
+    ["♻️ Compostages", S.prestiges],
+  ];
+  statsBox.innerHTML=rows.map(r=>`<div class="stat-row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
+}
+
+/* =========================================================================
+   COMPTEUR ANIMÉ
+   ========================================================================= */
+let shown=0;
+function updateCounter(){
+  const diff=S.bananas-shown;
+  if(Math.abs(diff)<0.5) shown=S.bananas; else shown+=diff*0.25;
+  elCount.innerHTML=fmt(shown)+' <span class="b">🍌</span>';
+  elPersec.textContent=fmt(perSecond())+" 🍌/s"+(prodFrenzy>0?" 🔥×7":"");
+  elPerclick.textContent="+"+fmt(clickPower())+" / clic"+(clickFrenzy>0?" ⚡×77":"");
+}
+
+/* =========================================================================
+   ACTIONS
+   ========================================================================= */
+function earn(n){ S.bananas+=n; S.totalEarned+=n; }
+
+function buyProducer(id){
+  const p=PMAP[id]; const owned=S.producers[id]||0;
+  let k=buyQty(p); if(k<=0)return;
+  const cost=bulkCost(p.cost,owned,k);
+  if(S.bananas<cost) return;
+  S.bananas-=cost; S.producers[id]=owned+k;
+  dailyAdd("buys",k);
+  blip(440); refreshEra(); updateAll();
+}
+function buyUpgrade(id){
+  const u=UMAP[id]; if(S.upgrades[id]||S.bananas<u.cost) return;
+  S.bananas-=u.cost; S.upgrades[id]=true;
+  blip(660); toast(`${u.ic} ${u.name} acheté !`); updateAll();
+}
+
+function doClick(clientX,clientY){
+  const gain=clickPower();
+  earn(gain);
+  S.totalClicks++;
+  bumpCombo(); dailyAdd("clicks",1);
+  checkHidden();   // pour les conditions liées au nombre exact de clics
+  spawnFloat(clientX,clientY,"+"+fmt(gain)+" 🍌");
+  spawnParticles(clientX,clientY);
+  bananaBtn.classList.remove("pop"); void bananaBtn.offsetWidth; bananaBtn.classList.add("pop");
+  blip(500 + Math.min(comboCount,24)*8, 0.04); // le pitch monte avec le combo
+}
+
+function tryAssemble(){
+  if(S.palier<8 || S.won || S.bananas<CONFIG.nano.cost) { if(S.bananas<CONFIG.nano.cost) toast("Pas assez de bananes 🍌"); return; }
+  S.bananas-=CONFIG.nano.cost;
+  S.won=true;
+  S.winStats={ time:S.playMs, total:S.totalEarned, clicks:S.totalClicks, golden:S.goldenClicks, producers:countProducers(S) };
+  renderAssemble(); renderPrestige(); updateAll();
+  if(CONFIG.features.boss){
+    // Acte III — la trahison d'Amine, puis le combat de boss
+    preloadPortraits(["boss","mechant","furieux","peureux","moqueur"]);   // prépare les portraits de combat
+    amineDialog(CONFIG.story.betrayal, {
+      mood:"mechant",
+      onLine:(i)=>{
+        if(i===2){ S.amineStolen=S.bananas; S.bananas=0; shown=0; updateCounter(); updateAll();
+                   shakeEl(document.querySelector(".count-wrap")); FX.confetti(40); blip(120,0.1); }
+      },
+      onDone:()=>openBossPrep()
+    });
+  } else { if(CONFIG.features.lore) S.lore.win=true; renderJournal(); overlayWin(); }
+}
+
+/* =========================================================================
+   BANANE DORÉE
+   ========================================================================= */
+const goldenEl=document.getElementById("golden");
+const frenzyEl=document.getElementById("frenzy");
+function scheduleGolden(){
+  const f=talentGoldenFreq()*specialGoldenFreq()*(weatherEff().goldenFreq||1);   // <1 = plus fréquent
+  goldenTimer = (CONFIG.golden.minDelay + Math.random()*(CONFIG.golden.maxDelay-CONFIG.golden.minDelay))*f;
+}
+function showGolden(){
+  goldenVisible=true; goldenLife=CONFIG.golden.lifetime; goldenEvil=false; goldenSpecial=null;
+  const uncollected = CONFIG.features.special ? CONFIG.special.filter(s=>!S.collection[s.id]) : [];
+  if(uncollected.length && Math.random()<CONFIG.specialChance){          // A4 — banane spéciale
+    goldenSpecial=uncollected[Math.floor(Math.random()*uncollected.length)];
+    goldenEl.textContent=goldenSpecial.ic; goldenEl.classList.remove("evil"); goldenEl.classList.add("special");
+    goldenEl.title="Banane spéciale !";
+  } else {
+    goldenEvil = CONFIG.features.rotten && Math.random()<CONFIG.rotten.chance;   // B4
+    goldenEl.textContent = goldenEvil ? "🤢" : "🌟";
+    goldenEl.classList.toggle("evil", goldenEvil); goldenEl.classList.remove("special");
+    goldenEl.title = goldenEvil ? "Beurk… pas sûr que ce soit une bonne idée" : "Attrape-la !";
+  }
+  const m=70;
+  goldenEl.style.left=(m+Math.random()*(innerWidth-2*m))+"px";
+  goldenEl.style.top=(m+Math.random()*(innerHeight-2*m-80))+"px";
+  goldenEl.style.display="flex";
+}
+function hideGolden(){ goldenVisible=false; goldenEvil=false; goldenSpecial=null; goldenEl.style.display="none"; scheduleGolden(); }
+goldenEl.addEventListener("click",()=>{
+  if(!goldenVisible)return;
+  const gr=goldenEl.getBoundingClientRect(), gx=gr.left+gr.width/2, gy=gr.top+gr.height/2;
+  if(goldenSpecial){                                // A4 — banane spéciale : bonus permanent
+    const sp=goldenSpecial; S.collection[sp.id]=true;
+    FX.burst(gx,gy,24,{glyph:sp.ic,size:11,spread:320,up:60,life:1}); FX.confetti(70);
+    toast("✨ Banane spéciale : "+sp.name+" — "+sp.desc); flashVignette(); blip(1180,0.09);
+    hideGolden(); renderCollection(); updateAll(); save(); return;
+  }
+  if(goldenEvil){                                   // B4 — banane pourrie : malus
+    rotPenalty=CONFIG.rotten.malusDur;
+    const loss=S.bananas*0.05; S.bananas=Math.max(0,S.bananas-loss);
+    FX.burst(gx,gy,16,{glyph:"🪰",size:9,spread:240,up:40,life:1});
+    toast("🤢 Beurk ! Banane pourrie : prod −"+Math.round((1-CONFIG.rotten.malusProd)*100)+"% (30 s) & −"+fmt(loss)+" 🍌");
+    flashVignette(); blip(130,0.08); hideGolden(); updateAll(); return;
+  }
+  S.goldenClicks++; dailyAdd("golds",1);
+  FX.burst(gx,gy,18,{glyph:"🌟",size:10,spread:300,up:60,life:0.9});
+  FX.burst(gx,gy,14,{color:"#ffd400",spread:280,up:80});
+  const r=Math.random();
+  if(r<0.55){ prodFrenzy=30; toast("🔥 FRÉNÉSIE ! Production ×7 (30 s)"); }
+  else if(r<0.8){ const lot=perSecond()*900 + clickPower()*30; earn(lot); toast("🍌 PLUIE DE BANANES ! +"+fmt(lot)); shakeEl(document.querySelector(".count-wrap")); FX.confetti(80); }
+  else { clickFrenzy=15; toast("⚡ CLIC CHARGÉ ! Clic ×77 (15 s)"); }
+  blip(880,0.08); hideGolden(); updateAll();
+});
+function updateFrenzyBanner(){
+  const parts=[];
+  if(prodFrenzy>0)  parts.push(`🔥 FRÉNÉSIE ×7 — ${Math.ceil(prodFrenzy)}s`);
+  if(clickFrenzy>0) parts.push(`⚡ CLIC ×77 — ${Math.ceil(clickFrenzy)}s`);
+  if(frenzyTimer>0) parts.push(`👊 COMBO ×${CONFIG.frenzy.mult} — ${Math.ceil(frenzyTimer)}s`);
+  if(rotPenalty>0)  parts.push(`🤢 POURRI −${Math.round((1-CONFIG.rotten.malusProd)*100)}% — ${Math.ceil(rotPenalty)}s`);
+  if(parts.length){
+    frenzyEl.style.display="block";
+    frenzyEl.style.color = rotPenalty>0? "#76b73a" : (prodFrenzy>0? "#ff6a00":"#ffe600");
+    frenzyEl.textContent = parts.join("    ");
+  } else frenzyEl.style.display="none";
+}
+
+/* =========================================================================
+   LOT v2 — météo (B2), événements (B1), quêtes (B3), spéciales (A4), talents (A3)
+   ========================================================================= */
+
+/* B2 — météo bananière */
+function pickWeather(){
+  if(!CONFIG.features.weather){ weatherCur=null; renderWeather(); return; }
+  const pool=CONFIG.weather.filter(w=>w!==weatherCur);
+  weatherCur=pool[Math.floor(Math.random()*pool.length)];
+  weatherTimer=CONFIG.weatherDelay.min+Math.random()*(CONFIG.weatherDelay.max-CONFIG.weatherDelay.min);
+  renderWeather();
+  if(weatherCur && weatherCur.id!=="clear") toast(weatherCur.ic+" Météo : "+weatherCur.name);
+}
+function renderWeather(){
+  if(!weatherEl) return;
+  if(!CONFIG.features.weather || !weatherCur){ weatherEl.style.display="none"; return; }
+  weatherEl.style.display="flex"; weatherEl.textContent=weatherCur.ic+" "+weatherCur.name;
+}
+
+/* B1 — événements à choix */
+function scheduleEvent(){ eventTimer=CONFIG.eventDelay.min+Math.random()*(CONFIG.eventDelay.max-CONFIG.eventDelay.min); }
+function fireEvent(){
+  if(!CONFIG.features.events){ scheduleEvent(); return; }
+  const ev=CONFIG.events[Math.floor(Math.random()*CONFIG.events.length)];
+  showOverlay(`<div class="title ink" style="font-size:22px">🎲 Événement</div>
+    <p style="font-weight:700;margin:14px 0;font-size:15px">${ev.text}</p>
+    <button class="btn" id="evA">${ev.a.label}</button>
+    <button class="btn alt" id="evB">${ev.b.label}</button>`);
+  document.getElementById("evA").addEventListener("click",()=>{ applyEventEffect(ev.a.eff); closeOverlay(); });
+  document.getElementById("evB").addEventListener("click",()=>{ applyEventEffect(ev.b.eff); closeOverlay(); });
+  scheduleEvent();
+}
+function applyEventEffect(eff){
+  if(!eff) return;
+  if(eff.prodFrenzyAlt){ eventBuffMult=eff.prodFrenzyAlt[0]; eventBuffTimer=eff.prodFrenzyAlt[1]; toast("⚡ Prod ×"+eff.prodFrenzyAlt[0]+" ("+eff.prodFrenzyAlt[1]+" s) !"); flashVignette(); }
+  if(eff.bananasMin){ const g=perSecond()*eff.bananasMin + clickPower()*eff.bananasMin; earn(g); toast("🍌 +"+fmt(g)); shakeEl(document.querySelector(".count-wrap")); FX.confetti(60); }
+  if(eff.permaProd){ S.permaProd=(S.permaProd||0)+eff.permaProd; toast("🧪 +"+Math.round(eff.permaProd*100)+"% prod permanente"); }
+  if(eff.bananasMul){ S.bananas*=eff.bananasMul; toast("💀 −"+Math.round((1-eff.bananasMul)*100)+"% de tes bananes"); }
+  if(eff.gamble){ if(Math.random()<0.5){ const g=perSecond()*1200+1000; earn(g); toast("🎉 JACKPOT ! +"+fmt(g)); FX.confetti(100);} else toast("📦 …la caisse était vide. Pas de bol !"); }
+  updateAll(); save();
+}
+
+/* B3 — quêtes journalières */
+function dayKey(){ try{ const d=new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }catch(e){ return "x"; } }
+function ensureDaily(){
+  if(!CONFIG.features.quests) return;
+  const k=dayKey();
+  if(!S.daily || S.daily.date!==k){
+    const pool=CONFIG.questPool.slice(), pick=[];
+    while(pick.length<3 && pool.length){ const i=Math.floor(Math.random()*pool.length); const q=pool.splice(i,1)[0];
+      pick.push({id:q.id, prog:0, target:q.target, done:false, claimed:false}); }
+    S.daily={ date:k, quests:pick };
+    renderQuests();
+  }
+}
+function dailyAdd(kind,n){
+  if(!S.daily) return; let ch=false;
+  S.daily.quests.forEach(q=>{ const def=CONFIG.questPool.find(x=>x.id===q.id);
+    if(def && def.kind===kind && !q.done){ q.prog+=n; if(q.prog>=q.target){ q.prog=q.target; q.done=true; toast("✅ Quête terminée ! Réclame ta récompense."); } ch=true; } });
+  if(ch) renderQuests();
+}
+function dailyBps(){
+  if(!S.daily) return; const ps=perSecond(); let ch=false;
+  S.daily.quests.forEach(q=>{ const def=CONFIG.questPool.find(x=>x.id===q.id);
+    if(def && def.kind==="bps" && !q.done){ q.prog=Math.min(q.target,ps); if(ps>=q.target){ q.done=true; ch=true; toast("✅ Quête terminée !"); } } });
+  if(ch) renderQuests();
+}
+function claimQuest(id){
+  if(!S.daily) return; const q=S.daily.quests.find(x=>x.id===id);
+  if(!q || !q.done || q.claimed) return;
+  q.claimed=true; S.adn+=CONFIG.questReward.adn;
+  toast("🎁 Récompense : +"+CONFIG.questReward.adn+" 🧬"); renderQuests(); updateAll(); save();
+}
+function renderQuests(){
+  if(!questsEl) return;
+  if(!CONFIG.features.quests || !S.daily){ questsEl.innerHTML="<div style='font-size:12px;opacity:.6'>—</div>"; return; }
+  questsEl.innerHTML=S.daily.quests.map(q=>{
+    const def=CONFIG.questPool.find(x=>x.id===q.id)||{}, pct=Math.min(100,q.prog/q.target*100);
+    const txt=(def.text||"").replace("{t}",fmt(q.target));
+    const foot=q.done ? (q.claimed?"✓ réclamé":`<button class="qclaim" data-claim="${q.id}">Réclamer +${CONFIG.questReward.adn}🧬</button>`) : `${fmt(Math.floor(q.prog))}/${fmt(q.target)}`;
+    return `<div class="quest ${q.done?"done":""}"><div class="qh">${def.ic||"📅"} ${txt}</div><div class="qbar"><i style="width:${pct}%"></i></div><div class="qf">${foot}</div></div>`;
+  }).join("");
+}
+
+/* A4 — collection de bananes spéciales */
+function renderCollection(){
+  if(!collectionEl) return;
+  if(!CONFIG.features.special){ collectionEl.innerHTML=""; return; }
+  collectionEl.innerHTML="";
+  CONFIG.special.forEach(s=>{
+    const d=document.createElement("div"); d.className="ach"+(S.collection[s.id]?" got":"");
+    d.textContent=S.collection[s.id]?s.ic:"❓"; d.title=S.collection[s.id]?(s.name+" — "+s.desc):"??? banane spéciale";
+    collectionEl.appendChild(d);
+  });
+}
+
+/* A3 — arbre de talents ADN */
+function talentBuyable(t){
+  if(S.talents[t.id]) return false;
+  return t.req.every(r=>S.talents[r]);
+}
+function buyTalent(id){
+  const t=CONFIG.talents.find(x=>x.id===id); if(!t) return;
+  if(S.talents[id] || !talentBuyable(t) || S.adn<t.cost) return;
+  S.adn-=t.cost; S.talents[id]=true;
+  toast("🧬 Talent : "+t.name); renderTalents(); updateAll(); save();
+}
+function renderTalents(){
+  if(!talentWrap) return;
+  if(!CONFIG.features.talents || (S.adn<=0 && Object.keys(S.talents).length===0 && S.prestiges===0)){ talentWrap.innerHTML=""; return; }
+  let html=`<div class="wsub" style="margin-top:18px">🧬 Arbre ADN <small style="opacity:.7;font-weight:700">— ${fmt(S.adn)} 🧬 dispo</small></div><div class="talent-tree">`;
+  for(const bk in CONFIG.branches){
+    const b=CONFIG.branches[bk];
+    html+=`<div class="tbranch"><div class="tbh">${b.ic} ${b.name}</div>`;
+    CONFIG.talents.filter(t=>t.branch===bk).forEach(t=>{
+      const owned=S.talents[t.id], can=talentBuyable(t)&&S.adn>=t.cost;
+      const cls=owned?"owned":(talentBuyable(t)?(can?"can":"poor"):"locked");
+      html+=`<button class="tnode ${cls}" data-talent="${t.id}" ${owned||!talentBuyable(t)?"disabled":""} title="${t.desc}">
+        <span class="tn-ic">${t.ic}</span><span class="tn-nm">${t.name}</span><span class="tn-c">${owned?"✓":t.cost+"🧬"}</span></button>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  talentWrap.innerHTML=html;
+}
+
+/* =========================================================================
+   SUCCÈS
+   ========================================================================= */
+function checkAchievements(){
+  CONFIG.achievements.forEach(a=>{
+    if(!S.achievements[a.id] && a.check(S)){
+      S.achievements[a.id]=true;
+      toast(`🏆 Succès : ${a.name}`);
+    }
+  });
+}
+
+/* =========================================================================
+   FX : moteur de particules <canvas> (pooling) + nombres flottants
+   ========================================================================= */
+const REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+if(REDUCE) document.body.classList.add("noanim");
+
+const FX=(function(){
+  const cv=document.getElementById("fx"), ctx=cv.getContext("2d");
+  let W=0,H=0,DPR=1;
+  function resize(){
+    DPR=Math.min(2, window.devicePixelRatio||1);
+    W=cv.width=Math.floor(innerWidth*DPR); H=cv.height=Math.floor(innerHeight*DPR);
+    cv.style.width=innerWidth+"px"; cv.style.height=innerHeight+"px";
+  }
+  resize(); window.addEventListener("resize",resize);
+  const pool=[], live=[], MAX=460;
+  const COLORS=["#ffd400","#ffb300","#ff9f1c","#fff3b0","#9bd60a","#33e8ff"];
+  function add(x,y,o){
+    if(live.length>=MAX) return;
+    const p=pool.pop()||{};
+    p.x=x*DPR; p.y=y*DPR; p.vx=(o.vx||0)*DPR; p.vy=(o.vy||0)*DPR;
+    p.g=(o.g==null?1400:o.g)*DPR; p.life=o.life||0.8; p.max=p.life;
+    p.size=(o.size||7)*DPR; p.rot=Math.random()*6.28; p.vr=(Math.random()-.5)*14;
+    p.color=o.color||COLORS[(Math.random()*COLORS.length)|0];
+    p.shape=o.shape||"rect"; p.glyph=o.glyph||null; p.drag=o.drag||0;
+    live.push(p);
+  }
+  function burst(cx,cy,n,opt){
+    if(REDUCE) return; opt=opt||{};
+    n=Math.min(n, MAX-live.length);
+    for(let i=0;i<n;i++){
+      const a=Math.random()*6.28, sp=(opt.spread||220)*(0.4+Math.random()*0.9);
+      add(cx,cy,{ vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-(opt.up||120),
+        size:opt.size||(5+Math.random()*5), life:opt.life||(0.6+Math.random()*0.5),
+        glyph:opt.glyph, shape:opt.shape, color:opt.color, g:opt.g });
+    }
+  }
+  function confetti(n){
+    if(REDUCE) return; n=Math.min(n||120, MAX-live.length);
+    for(let i=0;i<n;i++) add(Math.random()*innerWidth, -10-Math.random()*60, {
+      vx:(Math.random()-.5)*120, vy:120+Math.random()*240, g:320,
+      size:5+Math.random()*7, life:2.4+Math.random()*1.8, shape:"rect", drag:0.35 });
+  }
+  function trail(x,y){ if(REDUCE) return; add(x,y,{ vx:(Math.random()-.5)*50, vy:(Math.random()-.5)*50, g:0, size:4+Math.random()*4, life:0.5, shape:"circle", color:"#fff3b0" }); }
+  function step(dt){
+    for(let i=live.length-1;i>=0;i--){
+      const p=live[i]; p.life-=dt;
+      if(p.life<=0){ live.splice(i,1); pool.push(p); continue; }
+      if(p.drag) p.vx*=(1-p.drag*dt);
+      p.vy+=p.g*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
+    }
+  }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    for(const p of live){
+      ctx.globalAlpha=Math.max(0,Math.min(1,p.life/p.max));
+      if(p.glyph){ ctx.font=(p.size*2.4)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillText(p.glyph,0,0); ctx.restore(); }
+      else if(p.shape==="circle"){ ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,6.28); ctx.fill(); }
+      else { ctx.fillStyle=p.color; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.62); ctx.restore(); }
+    }
+    ctx.globalAlpha=1;
+  }
+  return { burst, confetti, trail, step, render, count:()=>live.length, canvas:cv };
+})();
+
+const fxLayer=document.getElementById("fxLayer");
+function localXY(clientX,clientY){ const r=fxLayer.getBoundingClientRect(); return [clientX-r.left, clientY-r.top]; }
+function spawnFloat(cx,cy,txt){
+  const [x,y]=localXY(cx,cy);
+  const el=document.createElement("div"); el.className="floatnum"; el.textContent=txt;
+  el.style.left=x+"px"; el.style.top=y+"px";
+  fxLayer.appendChild(el); setTimeout(()=>el.remove(),1000);
+}
+function spawnParticles(cx,cy){
+  FX.burst(cx,cy, 5, {glyph:"🍌", size:11, spread:250, up:90, life:0.7});
+  FX.burst(cx,cy, 7, {spread:270, up:130, life:0.6});
+}
+
+/* ---- banane vivante : combo + jauge de Frénésie (A1) + halo ---- */
+let comboCount=0, comboTimer=0;
+let frenzyGauge=0, frenzyTimer=0, idleSec=0;   // A1
+const comboEl=document.getElementById("combo");
+const haloEl=document.getElementById("bananaHalo");
+const frenzyGaugeEl=document.getElementById("frenzyGauge");
+const frenzyFill=document.getElementById("frenzyFill");
+function bumpCombo(){
+  comboCount++; comboTimer=1.3; idleSec=0;
+  comboEl.querySelector(".cn").textContent="×"+comboCount;
+  comboEl.classList.add("on","bump");
+  setTimeout(()=>comboEl.classList.remove("bump"),120);
+  if(CONFIG.features.frenzy && frenzyTimer<=0){
+    frenzyGauge=Math.min(1, frenzyGauge+CONFIG.frenzy.gainPerClick*(weatherEff().frenzyGain||1));
+    if(frenzyGauge>=1){ frenzyTimer=CONFIG.frenzy.duration+talentFrenzyDur(); dailyAdd("frenzies",1); toast("👊 FRÉNÉSIE DE CLIC ×"+CONFIG.frenzy.mult+" !"); flashVignette(); blip(990,0.08); }
+  }
+}
+function decayCombo(dt){
+  if(comboTimer>0){ comboTimer-=dt; if(comboTimer<=0){ comboCount=0; comboEl.classList.remove("on"); } }
+}
+function updateFrenzy(dt){
+  idleSec+=dt;   // suivi d'inactivité (succès caché), indépendant de la feature
+  if(!CONFIG.features.frenzy){ if(frenzyGaugeEl) frenzyGaugeEl.style.display="none"; return; }
+  if(frenzyTimer>0){ frenzyTimer-=dt; if(frenzyTimer<=0) frenzyGauge=0; }
+  else if(idleSec>CONFIG.frenzy.idleDelay){ frenzyGauge=Math.max(0, frenzyGauge-CONFIG.frenzy.decayPerSec*dt); }
+  frenzyFill.style.width=(frenzyGauge*100).toFixed(1)+"%";
+  frenzyGaugeEl.classList.toggle("active", frenzyTimer>0);
+}
+function updateHalo(){ const g=Math.min(1, Math.log10(perSecond()+1)/12); haloEl.style.setProperty("--glow", g.toFixed(2)); }
+
+/* ---- célébrations ---- */
+const vignette=document.getElementById("vignette");
+function flashVignette(){ if(REDUCE)return; vignette.classList.add("flash"); setTimeout(()=>vignette.classList.remove("flash"),500); }
+function bigText(msg){
+  const d=document.createElement("div"); d.className="bigtext ink"; d.textContent=msg;
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1700);
+}
+function shakeEl(el){ if(REDUCE)return; el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
+function celebrate(p){
+  FX.confetti(170); flashVignette(); bigText(`${p.ic} PALIER ${p.n}`);
+  shakeEl(document.querySelector(".count-wrap"));
+}
+
+/* =========================================================================
+   SON (WebAudio, optionnel)
+   ========================================================================= */
+let actx=null;
+function blip(freq,vol){
+  if(!S.sound) return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type="square"; o.frequency.value=freq;
+    g.gain.value=(vol||0.05); o.connect(g); g.connect(actx.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.12);
+    o.stop(actx.currentTime+0.13);
+  }catch(e){}
+}
+
+/* =========================================================================
+   TOASTS
+   ========================================================================= */
+const toastsEl=document.getElementById("toasts");
+function toast(msg){
+  const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  toastsEl.appendChild(t); setTimeout(()=>t.remove(),3000);
+  while(toastsEl.children.length>4) toastsEl.removeChild(toastsEl.firstChild);
+}
+
+/* =========================================================================
+   OVERLAYS
+   ========================================================================= */
+const overlay=document.getElementById("overlay");
+const overlayBox=document.getElementById("overlayBox");
+function showOverlay(html){ overlayBox.innerHTML=html; overlay.classList.remove("hidden"); }
+function closeOverlay(){
+  overlay.classList.add("hidden");
+  overlayBox.style.overflow=""; overlayBox.style.position="";
+  FX.canvas.style.zIndex="9";
+  winShowerTimers.forEach(clearTimeout); winShowerTimers=[];
+}
+overlay.addEventListener("click",e=>{ if(e.target===overlay) closeOverlay(); });
+
+function overlayWelcome(dt,capped,gain){
+  showOverlay(`
+    <div class="title ink" style="font-size:28px">😴 Re-bonjour !</div>
+    <p style="font-weight:700;margin:14px 0">Absent pendant <b>${fmtTime(dt*1000)}</b>${dt>capped?` (plafonné à ${CONFIG.offlineCapHours} h)`:""}.</p>
+    <p style="font-size:20px;font-weight:900">Tes producteurs ont récolté<br><span style="color:var(--accent2);font-size:30px">+${fmt(gain)} 🍌</span></p>
+    <button class="btn" onclick="closeOverlay()">Miam, merci 🍌</button>`);
+}
+let winShowerTimers=[];
+function overlayWin(){
+  const w=S.winStats;
+  const jokes=["Tu as atteint la singularité bananière. 🍌🌌",
+    "L'univers est désormais à 100% potassium.",
+    "Les physiciens ne comprennent pas. Toi non plus. Mais c'est jaune."];
+  blip(1040,0.1);
+  showOverlay(`
+    <span class="win-rays"></span>
+    <div class="win-banana">🍌</div>
+    <div class="title ink" style="font-size:32px">🏆 VRAIE FIN</div>
+    <p style="font-weight:800;font-size:16px;margin:10px 0">Tu as vaincu <b>AMINE-BANANE</b> et récupéré la Nano Banana !</p>
+    <p style="font-style:italic;opacity:.85">${jokes[Math.floor(Math.random()*jokes.length)]}</p>
+    <div style="text-align:left;margin:16px 0">
+      <div class="stat-row"><span>⏱️ Temps de run</span><b>${fmtTime(w.time)}</b></div>
+      <div class="stat-row"><span>🍌 Bananes totales</span><b>${fmt(w.total)}</b></div>
+      <div class="stat-row"><span>👆 Clics</span><b>${fmt(w.clicks)}</b></div>
+      <div class="stat-row"><span>🌟 Bananes dorées</span><b>${fmt(w.golden)}</b></div>
+      <div class="stat-row"><span>📦 Producteurs</span><b>${fmt(w.producers)}</b></div>
+      <div class="stat-row"><span>⚔️ Tentatives de boss</span><b>${w.attempts||1}</b></div>
+      ${w.restored?`<div class="stat-row"><span>💰 Bananes récupérées</span><b>${fmt(w.restored)}</b></div>`:""}
+    </div>
+    <button class="btn" onclick="closeOverlay()">Continuer en bac à sable 🏖️</button>
+    <button class="btn alt" onclick="closeOverlay(); openWidget('menu');">Voir le compostage ♻️</button>`);
+  overlayBox.style.position="relative"; overlayBox.style.overflow="hidden";
+  FX.canvas.style.zIndex="60"; // confettis au-dessus de l'overlay
+  winShowerTimers.forEach(clearTimeout);
+  winShowerTimers=[0,300,650,1000,1500].map(t=>setTimeout(()=>FX.confetti(120),t));
+  renderPrestige();
+}
+
+/* =========================================================================
+   HISTOIRE & BOSS (Amine)
+   ========================================================================= */
+const amineOverlay=document.getElementById("amineOverlay");
+const amineImg=document.getElementById("amineImg");
+const aminePortrait=document.querySelector(".amine-portrait");
+const amineEmoji=document.getElementById("amineEmoji");
+const amineNameEl=document.getElementById("amineName");
+const amineTextEl=document.getElementById("amineText");
+const amineBox=document.getElementById("amineBox");
+const amineNextBtn=document.getElementById("amineNext");
+let amineLines=[], amineIdx=0, amineDone=null, amineOnLine=null;
+/* ---- portraits d'Amine : cache + chaîne de fallback + préchargement à la demande ---- */
+const PORTRAIT_CACHE={};
+function loadPortrait(url, cb){
+  let e=PORTRAIT_CACHE[url];
+  if(e){ if(e.ok!==undefined){ cb(e.ok?e.img:null); } else { e.cbs.push(cb); } return; }
+  e=PORTRAIT_CACHE[url]={ img:new Image(), cbs:[cb] };
+  e.img.onload=()=>{ e.ok=true; e.cbs.forEach(f=>f(e.img)); e.cbs=[]; };
+  e.img.onerror=()=>{ e.ok=false; e.cbs.forEach(f=>f(null)); e.cbs=[]; };
+  e.img.src=url;
+}
+function moodChain(mood){
+  const m=CONFIG.assets.moods||{}, out=[];
+  if(m[mood]) out.push(m[mood]);
+  (CONFIG.assets.fallback||[]).forEach(u=>out.push(u));
+  return out;
+}
+function resolvePortrait(mood, cb){   // essaie l'humeur, puis les replis ; cb(img|null)
+  const chain=moodChain(mood); let i=0;
+  (function next(){ if(i>=chain.length){ cb(null); return; } loadPortrait(chain[i++], img=> img? cb(img): next()); })();
+}
+function preloadPortraits(moods){ if(!CONFIG.features.story)return; moods.forEach(m=>resolvePortrait(m,()=>{})); }
+function moodForChapter(n){ return n<=3?"joyeux":n<=6?"greedy":"mechant"; }
+
+function setAminePortrait(mood){
+  amineBox.classList.toggle("boss", mood==="boss");
+  amineNameEl.textContent = mood==="boss" ? "AMINE-BANANE" : "Amine";
+  resolvePortrait(mood, img=>{   // image telle quelle, sans filtre/recolor
+    if(img){ amineImg.src=img.src; aminePortrait.classList.add("has-img"); }
+    else { aminePortrait.classList.remove("has-img"); amineEmoji.textContent = (mood==="boss")?"😈":"🧔🏽"; }
+  });
+}
+function amineDialog(lines, opts){
+  opts=opts||{};
+  amineLines=lines.slice(); amineIdx=0; amineDone=opts.onDone||null; amineOnLine=opts.onLine||null;
+  setAminePortrait(opts.mood||"friendly");
+  amineOverlay.classList.remove("hidden");
+  showAmineLine();
+}
+function showAmineLine(){
+  amineTextEl.textContent=amineLines[amineIdx];
+  amineNextBtn.textContent = amineIdx>=amineLines.length-1 ? "OK ✓" : "Suivant ▶";
+  if(amineOnLine) amineOnLine(amineIdx);
+}
+amineNextBtn.addEventListener("click",()=>{
+  amineIdx++;
+  if(amineIdx>=amineLines.length){ amineOverlay.classList.add("hidden"); const d=amineDone; amineDone=null; amineOnLine=null; if(d)d(); return; }
+  showAmineLine();
+});
+
+/* ---- préparation au combat (boutique d'améliorations) ---- */
+function bossTalentDamage(){ if(S.talents&&S.talents.f4)return 15; if(S.talents&&S.talents.f3)return 8; if(S.talents&&S.talents.f1)return 3; return 0; }
+function combatStat(){
+  const cu=S.combat||{}, B=CONFIG.boss, U=CONFIG.combatUpgrades;
+  const eff=id=>U.find(u=>u.id===id).eff;
+  return {
+    lives: Math.min(B.maxLives, B.lives + (cu.life?1:0)),
+    radius: B.sliceRadius + (cu.magnet?eff("magnet").radius:0),
+    charge: B.chargePerBanana + (cu.cannon?eff("cannon").charge:0),
+    damage: B.shotDamage + (cu.ammo?eff("ammo").damage:0) + bossTalentDamage(),
+    vest: cu.vest?1:0,
+    slow: cu.slow?eff("slow").slow:1,
+  };
+}
+function buyCombatUpgrade(id){
+  const u=CONFIG.combatUpgrades.find(x=>x.id===id);
+  if(!u || S.combat[id] || S.bananas<u.cost) return;
+  S.bananas-=u.cost; S.combat[id]=true; toast("⚔️ "+u.name+" acheté !"); save(); updateAll(); openBossPrep();
+}
+function openBossPrep(){
+  const cs=combatStat();
+  const shop=CONFIG.combatUpgrades.map(u=>{
+    const owned=S.combat[u.id], ok=S.bananas>=u.cost;
+    return `<button class="card" data-cu="${u.id}" ${owned||!ok?"disabled":""}>
+      <span class="ic">${u.ic}</span><span class="body"><span class="nm">${u.name}</span><span class="ds">${u.desc}</span></span>
+      <span class="right"><span class="cost ${ok&&!owned?'ok':''}">${owned?'✓ acquis':fmt(u.cost)+' 🍌'}</span></span></button>`;
+  }).join("");
+  showOverlay(`<div class="title ink" style="font-size:24px">⚔️ Préparation</div>
+    <p style="font-weight:700;margin:8px 0;font-size:14px">Amine-Banane t'attend. Achète des améliorations (gardées à vie), puis frappe.</p>
+    <div style="font-size:13px;font-weight:900;margin:6px 0">🍌❤️ ${cs.lives} vies · 💥 ${cs.damage} dég/tir · ⚡ ${cs.charge} charge/banane</div>
+    <div class="list" id="cuList" style="text-align:left;margin:10px 0;max-height:34vh;overflow:auto">${shop}</div>
+    <button class="btn" id="btnFight" style="background:#160f00;color:var(--gold)">⚔️ COMBATTRE AMINE-BANANE</button>
+    <button class="btn alt" id="btnFlee">Retourner farmer 🍌</button>`);
+  overlayBox.style.overflow="hidden";
+  document.getElementById("cuList").addEventListener("click",e=>{ const b=e.target.closest("[data-cu]"); if(b) buyCombatUpgrade(b.dataset.cu); });
+  document.getElementById("btnFight").addEventListener("click",()=>{ closeOverlay(); Boss.start(); });
+  document.getElementById("btnFlee").addEventListener("click",closeOverlay);
+}
+
+/* ---- issue du combat ---- */
+function bossVictory(){
+  S.bossWon=true; S.bossAttempts++;
+  const restored=Math.floor((S.amineStolen||0)*CONFIG.boss.restoreBonus)+CONFIG.nano.cost;
+  S.bananas+=restored; S.amineStolen=0;
+  if(CONFIG.features.lore) S.lore.win=true;
+  S.winStats=Object.assign({ time:S.playMs, total:S.totalEarned, clicks:S.totalClicks, golden:S.goldenClicks, producers:countProducers(S) }, S.winStats||{}, { attempts:S.bossAttempts, restored });
+  shown=S.bananas; renderAssemble(); renderJournal(); renderPrestige(); updateAll(); save();
+  amineDialog(CONFIG.story.victory, { mood:"friendly", onDone:overlayWin });
+}
+function bossDefeat(){
+  S.bossAttempts++; renderAssemble(); save();
+  amineDialog([CONFIG.story.defeat], { mood:"moqueur", onDone:()=>{
+    showOverlay(`<div class="title ink" style="font-size:24px">💀 Défaite</div>
+      <p style="margin:12px 0;font-weight:700">Amine-Banane t'a eu. Retourne farmer, achète des améliorations, et reviens plus fort.</p>
+      <button class="btn" onclick="closeOverlay()">Retourner farmer 🍌</button>`);
+  }});
+}
+
+/* =========================================================================
+   COMBAT — « Banana Ninja » (canvas)
+   ========================================================================= */
+const Boss=(function(){
+  const layer=document.getElementById("bossLayer"), cv=document.getElementById("bossCanvas"), ctx=cv.getContext("2d");
+  let W=0,H=0,DPR=1, raf=0, running=false, st=null, last=0;
+  let bossImg=null, bossOk=false;
+  function resize(){ DPR=Math.min(2,devicePixelRatio||1); W=cv.width=Math.floor(innerWidth*DPR); H=cv.height=Math.floor(innerHeight*DPR); cv.style.width=innerWidth+"px"; cv.style.height=innerHeight+"px"; }
+  // entrée pointeur
+  let down=false, trail=[], combo=0;
+  function pos(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*DPR, y:(e.clientY-r.top)*DPR}; }
+  function onDown(e){ down=true; combo=0; trail=[pos(e)]; e.preventDefault(); }
+  function onMove(e){ if(!down||!st)return; const p=pos(e); const a=trail[trail.length-1]; trail.push(p); if(trail.length>6)trail.shift(); if(a) sliceSeg(a,p); e.preventDefault(); }
+  function onUp(e){ down=false; trail=[]; combo=0; if(e&&e.preventDefault)e.preventDefault(); }
+  function segDist(ax,ay,bx,by,px,py){ const dx=bx-ax,dy=by-ay; const l2=dx*dx+dy*dy; let t=l2? ((px-ax)*dx+(py-ay)*dy)/l2 : 0; t=Math.max(0,Math.min(1,t)); const x=ax+t*dx,y=ay+t*dy; return Math.hypot(px-x,py-y); }
+  function sliceSeg(a,b){ for(const o of st.objs){ if(o.sliced)continue; if(segDist(a.x,a.y,b.x,b.y,o.x,o.y) < o.r + st.radius*DPR) sliceObj(o); } }
+  function sliceObj(o){
+    o.sliced=true; o.vy=-120*DPR-Math.random()*120*DPR; o.vx=(Math.random()-.5)*260*DPR; o.spin=(Math.random()-.5)*16; o.life=0.7;
+    if(o.type==="bomb"){
+      if(st.vest){ st.vest=0; st.pops.push({x:o.x,y:o.y,life:.5,txt:"🛡️"}); toast("🛡️ Gilet : bombe absorbée !"); }
+      else { st.lives--; setTaunt(CONFIG.story.taunts.bomb, "moqueur"); flash("#f33",.45); st.shake=12; if(st.lives<=0){ lose(); return; } }
+    } else {
+      combo++; let add=st.charge + (combo>1?CONFIG.boss.comboBonus*(combo-1):0);
+      st.gauge=Math.min(CONFIG.boss.chargeMax, st.gauge+add);
+      st.pops.push({x:o.x,y:o.y,life:.45,txt:combo>1?("COMBO ×"+combo):"+"+Math.round(add)});
+      if(st.gauge>=CONFIG.boss.chargeMax) fire();
+    }
+  }
+  function fire(){
+    st.gauge=0; st.shots.push({x:W/2,y:H*0.74,life:.45});
+    st.hp=Math.max(0, st.hp-st.damage); flash("#fe6",.25); st.shake=8;
+    if(st.hp<=0){ win(); return; }
+    updatePhase();
+  }
+  function phaseIndex(){ const P=CONFIG.boss.phases; for(let i=0;i<P.length;i++){ if(st.hp> P[i].hpTo) return i; } return P.length-1; }
+  function updatePhase(){ const i=phaseIndex(); if(i!==st.phase){ st.phase=i;
+    if(i===1) setTaunt(rand(CONFIG.story.taunts.p2), "furieux");
+    if(i===2){ setTaunt(rand(CONFIG.story.taunts.p3), "peureux"); st.salvoT=CONFIG.boss.salvo.every; } } }
+  function rand(a){ return a[Math.floor(Math.random()*a.length)]; }
+  function setTaunt(t, mood){ st.taunt=t; st.tauntT=3.4; st.tauntImg=null;
+    if(mood) resolvePortrait(mood, img=>{ if(running && st) st.tauntImg=img; }); }
+  function flash(c,a){ st.flash={c,a}; }
+  function spawnObj(bomb){
+    const P=CONFIG.boss.phases[st.phase], r=34*DPR;
+    const x=r+Math.random()*(W-2*r);
+    const sp=(P.fall[0]+Math.random()*(P.fall[1]-P.fall[0]))*DPR*st.slow;
+    st.objs.push({ x, y:-r, vx:(Math.random()-.5)*40*DPR, vy:sp, r, type:bomb?"bomb":"banana", sliced:false, spin:0, rot:Math.random()*6.28 });
+  }
+  function spawnTick(dt){
+    const P=CONFIG.boss.phases[st.phase];
+    st.spawnT-=dt;
+    if(st.spawnT<=0){ st.spawnT += 1/P.rate; spawnObj(Math.random()<P.bombPct); }
+    if(st.phase===2){ st.salvoT-=dt; if(st.salvoT<=0){ st.salvoT=CONFIG.boss.salvo.every; for(let i=0;i<CONFIG.boss.salvo.count;i++) setTimeout(()=>{ if(running) spawnObj(true); }, i*180); } }
+  }
+  function update(dt){
+    spawnTick(dt);
+    for(let i=st.objs.length-1;i>=0;i--){ const o=st.objs[i];
+      o.vy += 520*DPR*dt; o.x+=o.vx*dt; o.y+=o.vy*dt; o.rot+=(o.spin||0)*dt;
+      if(o.sliced){ o.life-=dt; if(o.life<=0){ st.objs.splice(i,1); continue; } }
+      else if(o.y-o.r>H){ st.objs.splice(i,1); }   // tombée sans danger
+    }
+    for(let i=st.pops.length-1;i>=0;i--){ st.pops[i].life-=dt; st.pops[i].y-=40*DPR*dt; if(st.pops[i].life<=0) st.pops.splice(i,1); }
+    for(let i=st.shots.length-1;i>=0;i--){ st.shots[i].life-=dt; if(st.shots[i].life<=0) st.shots.splice(i,1); }
+    if(st.tauntT>0) st.tauntT-=dt;
+    if(st.shake>0) st.shake=Math.max(0,st.shake-dt*40);
+    if(st.flash){ st.flash.a-=dt*1.4; if(st.flash.a<=0) st.flash=null; }
+  }
+  function render(){
+    ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H);
+    // fond
+    const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#1a0f2e"); g.addColorStop(1,"#06040f"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const sh=st.shake? (Math.random()-.5)*st.shake*DPR : 0;
+    ctx.save(); ctx.translate(sh,0);
+    // boss
+    const bw=Math.min(W*0.5, 230*DPR), bx=W/2, by=H*0.20;
+    if(bossOk){ const r=bw/2; ctx.save(); ctx.beginPath(); ctx.arc(bx,by,r,0,6.28); ctx.closePath(); ctx.clip();
+      ctx.drawImage(bossImg, bx-r, by-r, bw, bw); ctx.restore();
+      ctx.lineWidth=4*DPR; ctx.strokeStyle="#9bff2a"; ctx.beginPath(); ctx.arc(bx,by,r,0,6.28); ctx.stroke();
+    } else { ctx.font=(bw*0.9)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("😈",bx,by); }
+    // barre PV
+    const pw=Math.min(W*0.7,320*DPR), px=bx-pw/2, py=by+bw/2+14*DPR;
+    ctx.fillStyle="#000"; ctx.fillRect(px-3*DPR,py-3*DPR,pw+6*DPR,18*DPR+6*DPR);
+    ctx.fillStyle="#3a2a1a"; ctx.fillRect(px,py,pw,18*DPR);
+    ctx.fillStyle="#ff3b6b"; ctx.fillRect(px,py,pw*Math.max(0,st.hp)/CONFIG.boss.hp,18*DPR);
+    ctx.fillStyle="#fff"; ctx.font="900 "+(13*DPR)+"px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("AMINE-BANANE  "+Math.ceil(st.hp)+" PV", bx, py+9*DPR);
+    // vies
+    ctx.textAlign="left"; ctx.font=(22*DPR)+"px serif"; ctx.textBaseline="top";
+    ctx.fillText("🍌❤️".repeat(st.lives) || "—", 12*DPR, 10*DPR);
+    // objets
+    for(const o of st.objs){ ctx.save(); ctx.translate(o.x,o.y); ctx.rotate(o.rot||0); ctx.globalAlpha=o.sliced?Math.max(0,o.life/0.7):1;
+      ctx.font=(o.r*2)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(o.type==="bomb"?"💣":"🍌", 0, 0); ctx.restore(); }
+    ctx.globalAlpha=1;
+    // tirs
+    for(const s of st.shots){ ctx.globalAlpha=Math.max(0,s.life/0.45);
+      ctx.strokeStyle="#ffe600"; ctx.lineWidth=10*DPR; ctx.beginPath(); ctx.moveTo(bx,H*0.78); ctx.lineTo(bx,by+bw/2); ctx.stroke();
+      ctx.font=(54*DPR)+"px serif"; ctx.textAlign="center"; ctx.fillText("🍌",bx,by); }
+    ctx.globalAlpha=1;
+    // pops
+    ctx.font="900 "+(16*DPR)+"px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    for(const p of st.pops){ ctx.globalAlpha=Math.max(0,p.life/0.45); ctx.fillStyle="#fff";
+      ctx.strokeStyle="#000"; ctx.lineWidth=3*DPR; ctx.strokeText(p.txt,p.x,p.y); ctx.fillText(p.txt,p.x,p.y); }
+    ctx.globalAlpha=1;
+    // traînée
+    if(trail.length>1){ ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=5*DPR; ctx.lineCap="round"; ctx.beginPath();
+      ctx.moveTo(trail[0].x,trail[0].y); for(let i=1;i<trail.length;i++) ctx.lineTo(trail[i].x,trail[i].y); ctx.stroke(); }
+    // jauge de charge
+    const gw=Math.min(W*0.8,360*DPR), gx=W/2-gw/2, gy=H-46*DPR;
+    ctx.fillStyle="#000"; ctx.fillRect(gx-3*DPR,gy-3*DPR,gw+6*DPR,20*DPR+6*DPR);
+    ctx.fillStyle="#222"; ctx.fillRect(gx,gy,gw,20*DPR);
+    ctx.fillStyle="#ffd400"; ctx.fillRect(gx,gy,gw*st.gauge/CONFIG.boss.chargeMax,20*DPR);
+    ctx.fillStyle="#fff"; ctx.font="900 "+(12*DPR)+"px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("CANON "+Math.round(st.gauge)+"%", W/2, gy+10*DPR);
+    // taunt (+ portrait d'humeur d'Amine)
+    if(st.tauntT>0){ ctx.globalAlpha=Math.min(1,st.tauntT);
+      if(st.tauntImg){ const r=30*DPR, ix=W/2, iy=H*0.46-48*DPR;
+        ctx.save(); ctx.beginPath(); ctx.arc(ix,iy,r,0,6.28); ctx.closePath(); ctx.clip();
+        ctx.drawImage(st.tauntImg, ix-r, iy-r, 2*r, 2*r); ctx.restore();
+        ctx.lineWidth=3*DPR; ctx.strokeStyle="#ffe600"; ctx.beginPath(); ctx.arc(ix,iy,r,0,6.28); ctx.stroke(); }
+      ctx.fillStyle="#ffe600"; ctx.font="900 "+(15*DPR)+"px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.strokeStyle="#000"; ctx.lineWidth=4*DPR; ctx.strokeText("💬 "+st.taunt, W/2, H*0.46, W*0.9); ctx.fillText("💬 "+st.taunt, W/2, H*0.46, W*0.9); ctx.globalAlpha=1; }
+    ctx.restore();
+    // flash plein écran
+    if(st.flash){ ctx.fillStyle=st.flash.c; ctx.globalAlpha=Math.max(0,st.flash.a); ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+  }
+  function loop(now){
+    if(!running) return;
+    let dt=(now-last)/1000; last=now; if(dt>0.05)dt=0.05;
+    try{ update(dt); render(); }catch(e){ console.error("[Boss]",e); }
+    raf=requestAnimationFrame(loop);
+  }
+  function start(){
+    const cs=combatStat();
+    resize();
+    // chargement juste-à-temps : sprite du boss + portraits de combat
+    resolvePortrait("boss", img=>{ bossImg=img; bossOk=!!img; });
+    preloadPortraits(["mechant","furieux","peureux","moqueur"]);
+    st={ hp:CONFIG.boss.hp, lives:cs.lives, gauge:0, phase:0, radius:cs.radius, charge:cs.charge, damage:cs.damage, vest:cs.vest, slow:cs.slow,
+         objs:[], pops:[], shots:[], spawnT:0.5, salvoT:CONFIG.boss.salvo.every, taunt:"", tauntT:0, tauntImg:null, shake:0, flash:null };
+    setTaunt(CONFIG.story.taunts.start, "mechant");
+    layer.classList.remove("hidden");
+    cv.addEventListener("pointerdown",onDown); cv.addEventListener("pointermove",onMove);
+    window.addEventListener("pointerup",onUp); window.addEventListener("resize",resize);
+    running=true; last=performance.now(); raf=requestAnimationFrame(loop);
+  }
+  function stop(){
+    running=false; cancelAnimationFrame(raf); layer.classList.add("hidden");
+    cv.removeEventListener("pointerdown",onDown); cv.removeEventListener("pointermove",onMove);
+    window.removeEventListener("pointerup",onUp); window.removeEventListener("resize",resize);
+    down=false; trail=[];
+  }
+  function win(){ stop(); bossVictory(); }
+  function lose(){ stop(); bossDefeat(); }
+  return { start, stop };
+})();
+
+/* =========================================================================
+   PRESTIGE (Composter → ADN)
+   ========================================================================= */
+function adnAvailable(){ return Math.floor(Math.sqrt(S.totalEarned/CONFIG.prestigeDivisor)*talentAdnGain()); }
+const prestigeWrap=document.getElementById("prestigeWrap");
+function renderPrestige(){
+  if(!S.bossWon && S.prestiges===0){ prestigeWrap.innerHTML=""; return; }
+  const gain=adnAvailable();
+  prestigeWrap.innerHTML=`
+    <h2 style="margin-top:18px">♻️ Composter (prestige)</h2>
+    <p style="font-size:12px;opacity:.8;line-height:1.4">Recommence à zéro mais gagne de l'<b>ADN de banane 🧬</b> permanent (+${(CONFIG.adnBonus*100)}% prod chacun). Les succès & compteurs restent.</p>
+    <p style="font-weight:900;margin:8px 0">Compostage ⇒ <span style="color:var(--accent2)">+${fmt(gain)} 🧬</span></p>
+    <button class="btn" id="btnPrestige" ${gain<1?"disabled":""}>Composter maintenant ♻️</button>`;
+  const b=document.getElementById("btnPrestige");
+  if(b) b.addEventListener("click",doPrestige);
+}
+function doPrestige(){
+  const gain=adnAvailable();
+  if(gain<1) return;
+  showOverlay(`<div class="title ink" style="font-size:26px">♻️ Composter ?</div>
+    <p style="margin:14px 0;font-weight:700">Tu vas perdre bananes, producteurs et améliorations, mais gagner <b style="color:var(--accent2)">+${fmt(gain)} 🧬</b>.</p>
+    <button class="btn" id="confirmPrestige">Composter ♻️</button>
+    <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
+  document.getElementById("confirmPrestige").addEventListener("click",()=>{
+    const keep={ adn:S.adn+gain, prestiges:S.prestiges+1, achievements:S.achievements,
+      totalClicks:S.totalClicks, goldenClicks:S.goldenClicks, won:S.won, winStats:S.winStats,
+      sound:S.sound, startTime:S.startTime, playMs:S.playMs, bigOffline:S.bigOffline,
+      lore:S.lore, ui:S.ui, usedTransfer:S.usedTransfer, bigReturn48:S.bigReturn48,
+      talents:S.talents, collection:S.collection, daily:S.daily,
+      introSeen:S.introSeen, bossWon:S.bossWon, bossAttempts:S.bossAttempts, combat:S.combat };
+    S=Object.assign(defaultState(), keep);
+    curEra=0; closeOverlay(); refreshEra(); renderLadder(); renderAssemble(); renderPrestige(); renderJournal();
+    renderTalents(); renderCollection(); renderQuests();
+    updateAll(); save(); toast("♻️ Composté ! +"+fmt(gain)+" 🧬");
+    setTimeout(()=>toast("👑 Titre : "+currentTitle()),500);
+  });
+}
+
+/* =========================================================================
+   MENU : export / import / reset / son
+   ========================================================================= */
+document.getElementById("btnExport").addEventListener("click",()=>{
+  S.usedTransfer=true; save();
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  showOverlay(`<div class="title ink" style="font-size:22px">📤 Export</div>
+    <p style="font-size:12px;opacity:.8">Copie ce code pour sauvegarder ta partie ailleurs :</p>
+    <textarea readonly id="exp">${code}</textarea>
+    <button class="btn" onclick="(function(){var t=document.getElementById('exp');t.select();document.execCommand('copy');})()">Copier</button>
+    <button class="btn alt" onclick="closeOverlay()">Fermer</button>`);
+});
+document.getElementById("btnImport").addEventListener("click",()=>{
+  showOverlay(`<div class="title ink" style="font-size:22px">📥 Import</div>
+    <p style="font-size:12px;opacity:.8">Colle ton code de sauvegarde :</p>
+    <textarea id="imp" placeholder="code base64…"></textarea>
+    <button class="btn" id="doImport">Charger</button>
+    <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
+  document.getElementById("doImport").addEventListener("click",()=>{
+    try{
+      const d=JSON.parse(decodeURIComponent(escape(atob(document.getElementById("imp").value.trim()))));
+      S=Object.assign(defaultState(),d); S.usedTransfer=true;
+      curEra=0; closeOverlay(); rebuildAll(); save(); toast("✅ Sauvegarde importée !");
+    }catch(e){ toast("❌ Code invalide"); }
+  });
+});
+document.getElementById("btnReset").addEventListener("click",()=>{
+  showOverlay(`<div class="title ink" style="font-size:24px">💥 Tout effacer ?</div>
+    <p style="margin:14px 0;font-weight:700">Cette action est définitive. Aucune banane ne survivra.</p>
+    <button class="btn danger" id="confirmReset">Oui, tout effacer</button>
+    <button class="btn alt" onclick="closeOverlay()">Annuler</button>`);
+  document.getElementById("confirmReset").addEventListener("click",()=>{
+    try{ localStorage.removeItem(CONFIG.saveKey); }catch(e){}
+    S=defaultState(); curEra=0; closeOverlay(); rebuildAll(); save(); toast("🌱 Nouvelle partie !");
+  });
+});
+const btnSound=document.getElementById("btnSound");
+btnSound.addEventListener("click",()=>{ S.sound=!S.sound; btnSound.textContent=S.sound?"🔊 Son : ON":"🔇 Son : OFF"; if(S.sound)blip(660); });
+
+/* ---- mode debug ---- */
+document.getElementById("btnDebug").addEventListener("click",()=>{ document.getElementById("debugPanel").classList.toggle("hidden"); });
+document.getElementById("debugPanel").addEventListener("click",e=>{
+  const b=e.target.closest("[data-dbg]"); if(!b) return;
+  switch(b.dataset.dbg){
+    case "m1": earn(1e6); toast("🐞 +1M 🍌"); break;
+    case "b1": earn(1e9); toast("🐞 +1Md 🍌"); break;
+    case "palier": { const nx=CONFIG.paliers.find(p=>p.n===S.palier+1);
+      if(nx){ earn(Math.max(1,nx.at-S.totalEarned)); checkPaliers(); } else toast("Déjà au dernier palier"); } break;
+    case "prod1": CONFIG.producers.forEach(p=>{ S.producers[p.id]=(S.producers[p.id]||0)+1; }); refreshEra(); toast("🐞 +1 de chaque producteur"); break;
+    case "eraNext": { dbgEra=((curEra||1)%5)+1; refreshEra(); toast("🎨 Thème "+dbgEra+"/5"); } break;
+    case "eraAuto": dbgEra=null; refreshEra(); toast("🎨 Thème auto"); break;
+    case "golden": if(!goldenVisible) showGolden(); toast("🌟 Banane dorée !"); break;
+    case "adn": S.adn+=10; toast("🐞 +10 🧬"); break;
+    case "win": { S.palier=8; for(let i=1;i<=8;i++) S.ingredients[i]=true; earn(CONFIG.nano.cost); renderAssemble(); tryAssemble(); } break;
+  }
+  refreshEra(); renderTalents(); renderCollection(); updateAll(); save();
+});
+
+/* quêtes (réclamer) & arbre ADN (acheter) — délégation */
+if(questsEl) questsEl.addEventListener("click",e=>{ const b=e.target.closest("[data-claim]"); if(b) claimQuest(b.dataset.claim); });
+if(talentWrap) talentWrap.addEventListener("click",e=>{ const b=e.target.closest("[data-talent]"); if(b) buyTalent(b.dataset.talent); });
+
+/* buy amount */
+document.getElementById("buySeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  const a=b.dataset.amt; S.buyAmount = a==="max"?"max":parseInt(a); updateProducers();
+});
+
+/* =========================================================================
+   WIDGETS : déplaçables (pointer), repliables, fermables + dock + persistance
+   ========================================================================= */
+const WKEYS=["prod","upg","ach","stats","menu"];
+let WL={};            // disposition vive { key:{x,y,open,collapsed} }
+let zTop=30;
+const widgetEl=k=>document.getElementById("w-"+k);
+const dockBtn=k=>document.querySelector('#dock [data-go="'+k+'"]');
+
+const UI_V=3;   // version de disposition : on force les nouveaux défauts non chevauchants
+function defaultLayout(){
+  const W=innerWidth, H=innerHeight, wide=W>=980;
+  const ww=wide?340:Math.min(W*0.92,440), top=60, gap=12;
+  if(wide){
+    const yb=Math.min(Math.round(H*0.50), H-300), cx=Math.round((W-ww)/2);
+    return {
+      prod :{x:gap,      y:top, open:true,  collapsed:false},  // haut-gauche
+      upg  :{x:W-ww-gap, y:top, open:true,  collapsed:false},  // haut-droite
+      ach  :{x:gap,      y:yb,  open:false, collapsed:false},  // bas-gauche
+      stats:{x:W-ww-gap, y:yb,  open:false, collapsed:false},  // bas-droite
+      menu :{x:cx,       y:top, open:false, collapsed:false},  // haut-centre (fermé)
+    };
+  }
+  // mobile : un seul ouvert, les autres en cascade (jamais empilés au même pixel)
+  const cx=Math.round((W-ww)/2), baseY=Math.max(top, Math.round(H*0.38));
+  const out={};
+  WKEYS.forEach((k,i)=>{ out[k]={ x:cx+i*8, y:baseY+i*24, open:i===0, collapsed:false }; });
+  return out;
+}
+function clampPos(st){
+  st.x=Math.max(6, Math.min(st.x, innerWidth-84));   // la barre reste attrapable
+  st.y=Math.max(2, Math.min(st.y, innerHeight-46));
+}
+function applyWidget(k){
+  const el=widgetEl(k), st=WL[k]; if(!el||!st) return;
+  clampPos(st);
+  el.style.left=st.x+"px"; el.style.top=st.y+"px";
+  el.classList.toggle("closed", !st.open);
+  el.classList.toggle("collapsed", !!st.collapsed);
+  dockBtn(k).classList.toggle("on", !!st.open);
+}
+function bringFront(k){ widgetEl(k).style.zIndex=(++zTop); }
+function openWidget(k){ WL[k].open=true; bringFront(k); applyWidget(k); S.ui=WL; save(); }
+function closeWidget(k){ WL[k].open=false; applyWidget(k); S.ui=WL; save(); }
+function toggleWidget(k){ WL[k].open?closeWidget(k):openWidget(k); }
+
+let widgetsBound=false;
+function bindWidgets(){
+  if(widgetsBound) return; widgetsBound=true;
+  WKEYS.forEach(k=>{
+    const el=widgetEl(k), bar=el.querySelector(".widget-bar");
+    bar.querySelector('[data-act="collapse"]').addEventListener("click",ev=>{ ev.stopPropagation();
+      WL[k].collapsed=!WL[k].collapsed; applyWidget(k); S.ui=WL; save(); });
+    bar.querySelector('[data-act="close"]').addEventListener("click",ev=>{ ev.stopPropagation(); closeWidget(k); });
+    let drag=null;
+    bar.addEventListener("pointerdown",ev=>{
+      if(ev.target.closest("[data-act]")) return;          // bouton ≠ déplacement
+      bringFront(k);
+      drag={ dx:ev.clientX-WL[k].x, dy:ev.clientY-WL[k].y };
+      try{ bar.setPointerCapture(ev.pointerId); }catch(e){}
+      el.classList.add("drag"); ev.preventDefault();
+    });
+    bar.addEventListener("pointermove",ev=>{
+      if(!drag) return;
+      WL[k].x=ev.clientX-drag.dx; WL[k].y=ev.clientY-drag.dy; clampPos(WL[k]);
+      el.style.left=WL[k].x+"px"; el.style.top=WL[k].y+"px";
+    });
+    const end=()=>{ if(!drag)return; drag=null; el.classList.remove("drag"); S.ui=WL; save(); };
+    bar.addEventListener("pointerup",end); bar.addEventListener("pointercancel",end);
+    el.addEventListener("pointerdown",()=>bringFront(k));   // cliquer le corps remonte aussi
+  });
+  document.getElementById("dock").addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(b) toggleWidget(b.dataset.go);
+  });
+  window.addEventListener("resize",()=>WKEYS.forEach(applyWidget));
+}
+function layoutWidgets(){
+  const def=defaultLayout();
+  if(!S.ui || S.ui._v!==UI_V){          // pas de save, ou ancienne version → on (ré)applique les défauts non chevauchants
+    WL=def; WL._v=UI_V;
+  }else{
+    WL=Object.assign({}, def, S.ui);    // on respecte les positions personnalisées du joueur
+    WKEYS.forEach(k=>{ if(!WL[k]||typeof WL[k].x!=="number") WL[k]=def[k]; });
+  }
+  WKEYS.forEach(applyWidget);
+  S.ui=WL;
+}
+
+/* =========================================================================
+   CLIC BANANE — pointerdown = réactivité immédiate, zéro délai 300ms
+   ========================================================================= */
+const bananaBtn=document.getElementById("bananaBtn");
+bananaBtn.addEventListener("pointerdown",e=>{ e.preventDefault(); doClick(e.clientX,e.clientY); },{passive:false});
+bananaBtn.addEventListener("contextmenu",e=>e.preventDefault());
+
+/* =========================================================================
+   MISES À JOUR GROUPÉES
+   ========================================================================= */
+function updateAll(){
+  updateProducers(); updateUpgrades(); updateProg(); updateStats(); updateTitle();
+  document.getElementById("adnCount").textContent=fmt(S.adn);
+}
+function rebuildAll(){
+  buildProducers(); buildUpgrades(); buildAch(); buildHidden();
+  renderLadder(); renderAssemble(); renderPrestige(); renderJournal();
+  renderWeather(); renderQuests(); renderCollection(); renderTalents();
+  refreshEra(); updateAch(); updateTitle(); updateAll();
+  layoutWidgets();
+  btnSound.textContent=S.sound?"🔊 Son : ON":"🔇 Son : OFF";
+  // resync buy seg
+  document.querySelectorAll("#buySeg button").forEach(b=>b.classList.toggle("on", (b.dataset.amt==="max"&&S.buyAmount==="max")||(parseInt(b.dataset.amt)===S.buyAmount)));
+}
+
+/* =========================================================================
+   BOUCLE DE JEU
+   ========================================================================= */
+let lastT=performance.now(), slowAcc=0, saveAcc=0, trailAcc=0, fxDirty=false;
+let loopErrLogged=false;
+function loop(now){
+  try{ loopBody(now); }
+  catch(e){ if(!loopErrLogged){ loopErrLogged=true; console.error("[NanoBanana] erreur de boucle (ignorée pour ne pas figer le jeu) :", e); } }
+  requestAnimationFrame(loop);
+}
+function loopBody(now){
+  let dt=(now-lastT)/1000; lastT=now;
+  if(dt>1) dt=1; // anti-saut (onglet en arrière-plan)
+
+  // production
+  earn(perSecond()*dt);
+  if(document.visibilityState==="visible") S.playMs+=dt*1000;
+
+  // timers d'effets
+  if(prodFrenzy>0) prodFrenzy=Math.max(0,prodFrenzy-dt);
+  if(clickFrenzy>0) clickFrenzy=Math.max(0,clickFrenzy-dt);
+  if(rotPenalty>0) rotPenalty=Math.max(0,rotPenalty-dt);
+  if(eventBuffTimer>0) eventBuffTimer=Math.max(0,eventBuffTimer-dt);
+  if(CONFIG.features.weather){ weatherTimer-=dt; if(weatherTimer<=0) pickWeather(); }
+  if(CONFIG.features.events){ eventTimer-=dt; if(eventTimer<=0) fireEvent(); }
+  decayCombo(dt); updateFrenzy(dt);
+  if(goldenVisible){ goldenLife-=dt; if(goldenLife<=0) hideGolden();
+    else { trailAcc+=dt; if(trailAcc>0.05){ trailAcc=0; const r=goldenEl.getBoundingClientRect(); FX.trail(r.left+r.width/2, r.top+r.height/2); } } }
+  else { goldenTimer-=dt; if(goldenTimer<=0) showGolden(); }
+
+  // particules : on ne dessine que s'il y a quelque chose (économie batterie)
+  if(FX.count()>0){ FX.step(dt); FX.render(); fxDirty=true; }
+  else if(fxDirty){ FX.render(); fxDirty=false; }
+
+  // affichage chaque frame
+  updateCounter(); updateFrenzyBanner();
+
+  // logique plus lourde ~4×/s
+  slowAcc+=dt;
+  if(slowAcc>=0.25){ slowAcc=0;
+    checkPaliers(); checkAchievements(); checkHidden(); refreshEra(); updateHalo();
+    ensureDaily(); dailyBps();
+    updateProducers(); updateUpgrades(); updateProg(); updateAch(); updateStats();
+    document.getElementById("adnCount").textContent=fmt(S.adn);
+  }
+  // auto-save
+  saveAcc+=dt; if(saveAcc>=CONFIG.autoSaveMs/1000){ saveAcc=0; save(); }
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+function init(){
+  const had=load();
+  if(!had){ S=defaultState(); }
+  shown=S.bananas;
+  bindWidgets();
+  rebuildAll();
+  updateHalo();
+  firstPaint=false;               // à partir d'ici, les apparitions/achats s'animent
+  // Acte I — intro d'Amine (tuto déguisé). Le popup hors-ligne attend la fin de l'intro.
+  if(CONFIG.features.story && !S.introSeen && !S.won){
+    preloadPortraits(["friendly","joyeux"]);
+    amineDialog(CONFIG.story.intro, { mood:"friendly", onDone:()=>{ S.introSeen=true; save(); if(had) applyOffline(); } });
+  } else {
+    S.introSeen=true; if(had) applyOffline();
+  }
+  if(saveTampered) setTimeout(()=>toast("⚠️ Sauvegarde modifiée détectée"),800);
+  // lot v2 : démarrage météo / événements / quêtes
+  if(CONFIG.features.weather){ weatherCur=CONFIG.weather.find(w=>w.id==="clear")||CONFIG.weather[0];
+    weatherTimer=CONFIG.weatherDelay.min+Math.random()*(CONFIG.weatherDelay.max-CONFIG.weatherDelay.min); renderWeather(); }
+  scheduleEvent(); ensureDaily();
+  scheduleGolden();
+  // sauvegarde à la fermeture / mise en arrière-plan
+  window.addEventListener("beforeunload", save);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") save(); });
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+</body>
+</html>
